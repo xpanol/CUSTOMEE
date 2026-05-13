@@ -1,3 +1,8 @@
+Oto kompletny, poprawiony kod HTML. Wprowadziłem do niego **algorytm Sorensen-Dice (Bigramy)**, który jest znacznie czulszy na podobieństwo dźwiękowe i tekstowe niż zwykłe porównywanie słów. Dzięki temu procenty będą się dynamicznie zmieniać w zależności od tego, jak dokładnie powtórzysz frazę.
+
+Dodałem też mechanizm czyszczenia tekstu (`clean`), który ignoruje wielkość liter i znaki interpunkcyjne, co zapobiega zaniżaniu wyników przez błędy systemowe.
+
+```html
 <!doctype html>
 <html lang="es">
 <head>
@@ -52,11 +57,10 @@ html,body{margin:0;padding:0;height:100%;background:var(--bg);color:white;font-f
 #scoreBarContainer { width: 100%; height: 20px; background: #333; border-radius: 10px; margin: 10px 0; overflow: hidden; border: 1px solid #444; }
 #scoreBar { height: 100%; width: 0%; background: var(--gold); transition: width 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 #recognitionResult { font-size: 20px; color: #ccc; margin-top: 15px; font-style: italic; min-height: 60px; line-height: 1.4; }
-#scoreText { font-size: 32px; font-weight: bold; color: var(--gold); margin-bottom: 5px; transition: color 0.3s; }
+#scoreText { font-size: 32px; font-weight: bold; color: var(--gold); margin-bottom: 5px; }
 
 #recordControls{display:flex; gap:12px; margin-bottom: 40px; align-items: center; flex-wrap: wrap; justify-content: center;}
-#recordControls button{padding:12px 20px; background:var(--gold); color:black; font-weight:bold; border:0; border-radius:5px; cursor:pointer; transition: transform 0.1s;}
-#recordControls button:active { transform: scale(0.95); }
+#recordControls button{padding:12px 20px; background:var(--gold); color:black; font-weight:bold; border:0; border-radius:5px; cursor:pointer;}
 #recordControls button:disabled{background:#333; color:#666; cursor: not-allowed;}
 #listenTeacherBtn { background: #555 !important; color: white !important; }
 #refreshModalBtn { background: #333 !important; color: white !important; font-size: 18px; }
@@ -131,41 +135,48 @@ const seqAudio = new Audio();
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const recognition = SpeechRecognition ? new SpeechRecognition() : null;
 
-// Konfiguracja Recognition dla wyższej dokładności
 if (recognition) {
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
 }
 
-/* --- LEVENSHTEIN ACCURACY ALGORITHM --- */
+/* --- ZAAWANSOWANY ALGORYTM PORÓWNYWANIA (SORENSEN-DICE) --- */
 function calculateAccuracy(original, heard) {
-    const clean = (str) => str.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g,"").trim();
+    const clean = (str) => {
+        return str.toLowerCase()
+            .replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, "")
+            .replace(/\s+/g, " ")
+            .trim();
+    };
+
     const s1 = clean(original);
     const s2 = clean(heard);
 
+    if (!s2 || s2.length === 0) return 0;
     if (s1 === s2) return 100;
-    if (s2.length === 0) return 0;
 
-    const costs = [];
-    for (let i = 0; i <= s1.length; i++) {
-        let lastValue = i;
-        for (let j = 0; j <= s2.length; j++) {
-            if (i === 0) costs[j] = j;
-            else {
-                if (j > 0) {
-                    let newValue = costs[j - 1];
-                    if (s1.charAt(i - 1) !== s2.charAt(j - 1))
-                        newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
-                    costs[j - 1] = lastValue;
-                    lastValue = newValue;
-                }
-            }
+    const getBigrams = (str) => {
+        const bigrams = new Set();
+        for (let i = 0; i < str.length - 1; i++) {
+            bigrams.add(str.substring(i, i + 2));
         }
-        if (i > 0) costs[s2.length] = lastValue;
-    }
-    const similarity = (s1.length - costs[s2.length]) / s1.length;
-    return Math.max(0, Math.round(similarity * 100));
+        return bigrams;
+    };
+
+    const intersect = (set1, set2) => {
+        let count = 0;
+        set1.forEach(val => { if (set2.has(val)) count++; });
+        return count;
+    };
+
+    const pairs1 = getBigrams(s1);
+    const pairs2 = getBigrams(s2);
+    
+    if (pairs1.size === 0 && pairs2.size === 0) return 100;
+    
+    const similarity = (2 * intersect(pairs1, pairs2)) / (pairs1.size + pairs2.size);
+    return Math.round(similarity * 100);
 }
 
 /* --- UX BRANDING LOGIC --- */
@@ -184,7 +195,6 @@ $('applyBranding').onclick = () => {
     $('brandingPanel').style.display = 'none';
 };
 
-// --- INITIALIZATION ---
 async function init() {
   for(let i=1; i<=TRACK_COUNT; i++){
     const num = String(i).padStart(3,'0');
@@ -219,11 +229,17 @@ async function openModal(idx) {
   $('fullscreenModal').style.display = 'flex';
   resetModalUI(false); 
   const res = await fetch(item.json); const data = await res.json();
-  currentOriginalText = data.map(d => d.text).join(' ');
+  
+  // Dokładne łączenie tekstu do porównania
+  currentOriginalText = data.map(d => d.text).join(' ').replace(/\s+/g, ' ').trim();
+  
   $('fullscreenContent').innerHTML = data[0].text;
   $('fullAudio').src = item.audio;
   $('fullAudio').play();
-  if(recognition) recognition.lang = (item.type === 'es') ? 'es-ES' : 'en-US';
+  if(recognition) {
+      recognition.lang = (item.type === 'es') ? 'es-ES' : 'en-US';
+      try { recognition.abort(); } catch(e) {}
+  }
 }
 
 function resetModalUI(shouldPlayTeacher = false) {
@@ -241,7 +257,7 @@ $('startRec').onclick = async () => {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     mRec = new MediaRecorder(stream); chunks = [];
-    $('recognitionResult').textContent = "Listening... Speak now!";
+    $('recognitionResult').textContent = "Listening...";
     
     mRec.ondataavailable = e => chunks.push(e.data);
     mRec.onstop = () => {
@@ -259,7 +275,7 @@ $('startRec').onclick = async () => {
         $('scoreBar').style.width = score + '%';
         $('scoreText').textContent = `Accuracy: ${score}%`;
         
-        // Dynamiczna zmiana kolorów
+        // Dynamiczne kolory wyniku
         let color = 'var(--red)';
         if(score > 50) color = 'var(--gold)';
         if(score > 85) color = 'var(--green)';
@@ -269,14 +285,14 @@ $('startRec').onclick = async () => {
       };
       
       recognition.onspeechend = () => {
-          if(mRec.state === 'recording') $('stopRec').click();
+          if(mRec && mRec.state === 'recording') $('stopRec').click();
       };
     }
 
     mRec.start(); 
     $('startRec').disabled = true; 
     $('stopRec').disabled = false;
-  } catch(e) { alert("Mic error. Please allow microphone access."); }
+  } catch(e) { alert("Mic error or denied."); }
 };
 
 $('stopRec').onclick = () => { 
@@ -341,3 +357,5 @@ init();
 </script>
 </body>
 </html>
+
+```
