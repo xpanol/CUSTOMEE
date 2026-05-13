@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>MARKETING DIGITAL - PRO AGENCJA MODE</title>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
+<style>
+/* Zmienne CSS, które kontrolują wygląd - sterowane przez JS */
+:root {
+  --gold: #F8AC10;
+  --red: rgb(240,50,70);
+  --green: #4CAF50;
+  --brown: #9b835a;
+  --bg: #000000;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%;background:var(--bg);color:white;font-family:'Special Elite',monospace;scroll-behavior: smooth}
+
+/* HEADER */
+#stickyHeader {
+  position: fixed; top: 0; left: 0; width: 100%; background: var(--bg); 
+  z-index: 10000; padding: 15px 0; border-bottom: 3px solid var(--gold);
+  display: flex; flex-direction: column; align-items: center;
+}
+#headerLogo { height: 40px; margin-bottom: 10px; display: none; }
+#buttonsContainer{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;}
+.main-btn{background:var(--gold);color:black;padding:10px 18px;font-weight:bold; border:0; border-radius:5px; cursor:pointer;}
+
+/* BRANDING PANEL (Dla Agencji) */
+#brandingToggle { position: fixed; top: 10px; right: 10px; z-index: 11000; background: #333; color: white; border: 0; padding: 10px; cursor: pointer; border-radius: 5px; opacity: 0.5; }
+#brandingToggle:hover { opacity: 1; }
+#brandingPanel {
+  display: none; position: fixed; top: 60px; right: 10px; width: 250px; background: #222; 
+  border: 2px solid var(--gold); z-index: 11000; padding: 15px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+#brandingPanel input { width: 100%; margin-bottom: 10px; padding: 5px; }
+
+#players { max-width: 1000px; margin: 240px auto 100vh auto; padding: 20px; }
+.player{ display:flex; align-items:flex-start; gap:20px; margin-bottom:60px; padding:15px; scroll-margin-top: 240px;} 
+.player button{background:var(--gold);color:black;width:50px;height:50px;min-width:50px;font-size:26px;border-radius:50%;border:0;cursor:pointer;}
+
+.karaoke-line{font-size:32px; display:flex; flex-wrap:wrap; gap:12px; line-height: 1.3;}
+.word{color:white; transition: color 0.1s;}
+.completed{color:var(--brown) !important}
+.is-past { opacity: 0.1 !important; pointer-events: none; }
+
+/* MODALS */
+#shadowingPause, #fullscreenModal {
+  display:none; position:fixed; left:0; top:0; width:100%; height:100%;
+  justify-content:center; align-items:center; flex-direction:column; z-index:20000; background:rgba(0,0,0,0.98);
+}
+#pauseLine { width: 90%; text-align: center; display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; font-size: 45px; }
+
+/* AI EVALUATION STYLE */
+#evaluationContainer { margin: 20px 0; width: 80%; max-width: 600px; text-align: center; }
+#scoreBarContainer { width: 100%; height: 20px; background: #333; border-radius: 10px; margin: 10px 0; overflow: hidden; }
+#scoreBar { height: 100%; width: 0%; background: var(--gold); transition: width 0.4s ease; }
+#recognitionResult { font-size: 24px; color: #ccc; margin-top: 15px; font-style: italic; min-height: 60px; }
+#scoreText { font-size: 32px; font-weight: bold; color: var(--gold); margin-bottom: 5px; }
+
+#recordControls{display:flex; gap:12px; margin-bottom: 40px; align-items: center; flex-wrap: wrap; justify-content: center;}
+#recordControls button{padding:12px 20px; background:var(--gold); color:black; font-weight:bold; border:0; border-radius:5px; cursor:pointer;}
+#recordControls button:disabled{background:#333; color:#666;}
+#listenTeacherBtn { background: #555 !important; color: white !important; }
+#refreshModalBtn { background: #333 !important; color: white !important; font-size: 18px; }
+</style>
+</head>
+<body>
+
+<button id="brandingToggle">⚙️ BRANDING</button>
+<div id="brandingPanel">
+    <label>Client Name:</label>
+    <input type="text" id="inClientName" placeholder="e.g. Zara">
+    <label>Logo URL:</label>
+    <input type="text" id="inLogoUrl" placeholder="https://logo.png">
+    <label>Primary Color:</label>
+    <input type="color" id="inColor" value="#F8AC10">
+    <button class="main-btn" style="width:100%" id="applyBranding">Apply Branding</button>
+</div>
+
+<div id="stickyHeader">
+  <img id="headerLogo" src="" alt="Logo">
+  <h1 id="mainTitle" style="color:var(--gold); font-size:24px; margin:10px 0; letter-spacing:2px;">MARKETING DIGITAL</h1>
+  <div id="buttonsContainer">
+    <button id="playAllButton" class="main-btn">▶ PLAY ALL</button>
+    <button id="playESButton" class="main-btn">🇪🇸 SPANISH</button>
+    <button id="playENButton" class="main-btn">🇺🇸 ENGLISH</button>
+    <button id="pauseBtn" class="main-btn">⏸ PAUSE</button>
+    <button id="resetAllButton" class="main-btn">RESET</button>
+  </div>
+</div>
+
+<div id="players"></div>
+
+<div id="shadowingPause">
+  <div style="position: absolute; top: 30px; right: 30px; display: flex; gap: 15px;">
+     <button id="shaNextBtn" class="main-btn">NEXT ➔</button>
+     <button id="shaCloseBtn" class="main-btn" style="background:var(--red); color:white;">✖</button>
+  </div>
+  <div style="color:var(--gold); font-size:60px; font-weight:bold; margin-bottom:20px;">SHA! <span id="pauseTimer"></span></div>
+  <div id="pauseLine"></div>
+</div>
+
+<div id="fullscreenModal">
+  <button id="fullscreenClose" style="position:absolute;top:20px;right:20px;background:var(--gold);padding:10px 15px; border:0; border-radius:5px;">✖</button>
+  <div id="fullscreenContent" style="flex-grow:1; display:flex; align-items:center; font-size:45px; text-align:center; padding: 20px;"></div>
+  
+  <div id="evaluationContainer">
+    <div id="scoreText">Ready to check?</div>
+    <div id="scoreBarContainer"><div id="scoreBar"></div></div>
+    <div id="recognitionResult">Click RECORD and speak...</div>
+  </div>
+
+  <div id="recordControls">
+    <button id="listenTeacherBtn">📢 VUELVE A ESCUCHAR</button>
+    <button id="startRec">🎤 RECORD</button>
+    <button id="stopRec" disabled>🛑 STOP</button>
+    <button id="playRec" disabled>👂 LISTEN ME</button>
+    <button id="refreshModalBtn" title="Clear Results">↻</button>
+  </div>
+  <audio id="fullAudio" style="display:none"></audio>
+  <audio id="playBack" style="display:none"></audio>
+</div>
+
+<script>
+const BASE_URL = 'https://raw.githubusercontent.com/xpanol/PLAYERS/main/';
+const TRACK_COUNT = 30;
+const $ = id => document.getElementById(id);
+const seqAudio = new Audio();
+let playerControls = [], order = [], activeSeq = [], curIdx = 0;
+let hRaf = null, cInterval = null, isPlayingAll = false, isPaused = false;
+let mRec, chunks = [], currentOriginalText = "";
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const recognition = SpeechRecognition ? new SpeechRecognition() : null;
+
+/* --- UX BRANDING LOGIC --- */
+$('brandingToggle').onclick = () => {
+    const p = $('brandingPanel');
+    p.style.display = p.style.display === 'block' ? 'none' : 'block';
+};
+
+$('applyBranding').onclick = () => {
+    const newColor = $('inColor').value;
+    const newName = $('inClientName').value;
+    const newLogo = $('inLogoUrl').value;
+
+    if(newName) $('mainTitle').textContent = newName.toUpperCase();
+    if(newLogo) { $('headerLogo').src = newLogo; $('headerLogo').style.display = 'block'; }
+    
+    // Zastosowanie koloru do zmiennych CSS (cały interfejs się zmieni)
+    document.documentElement.style.setProperty('--gold', newColor);
+    $('brandingPanel').style.display = 'none';
+};
+
+function calculateAccuracy(original, heard) {
+    const origWords = original.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g,"").split(/\s+/);
+    const heardWords = heard.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g,"").split(/\s+/);
+    let matches = 0;
+    origWords.forEach(word => { if(heardWords.includes(word)) matches++; });
+    return Math.round((matches / origWords.length) * 100);
+}
+
+// --- INITIALIZATION ---
+async function init() {
+  for(let i=1; i<=TRACK_COUNT; i++){
+    const num = String(i).padStart(3,'0');
+    order.push({ audio: BASE_URL+num+'_es.mp3', json: BASE_URL+num+'_es.json', type:'es' });
+    order.push({ audio: BASE_URL+'Z'+num+'_en.mp3', json: BASE_URL+'Z'+num+'_en.json', type:'z' });
+  }
+  for(let i=0; i<order.length; i++) {
+    const item = order[i];
+    try {
+      const res = await fetch(item.json); const data = await res.json();
+      const div = document.createElement('div'); div.className = 'player';
+      const btn = document.createElement('button'); btn.textContent = '▶';
+      const line = document.createElement('div'); line.className = 'karaoke-line';
+      const spans = [];
+      data.forEach(l => {
+        const words = l.text.split(' '), sT = l.start.split(':').reduce((a,t)=>60*a+ +t,0), eT = l.end.split(':').reduce((a,t)=>60*a+ +t,0), wD = (eT - sT) / words.length;
+        words.forEach((w, j) => {
+          const s = document.createElement('span'); s.textContent = w + ' ';
+          s.dataset.start = (sT + j*wD).toFixed(2); s.dataset.end = (sT + (j+1)*wD).toFixed(2);
+          s.dataset.type = item.type; s.className = 'word'; line.appendChild(s); spans.push(s);
+        });
+      });
+      div.append(btn, line); $('players').appendChild(div);
+      playerControls.push({ spans });
+      btn.onclick = () => { stopEverything(); openModal(i); };
+    } catch(e) {}
+  }
+}
+
+async function openModal(idx) {
+  curIdx = idx; const item = order[idx];
+  $('fullscreenModal').style.display = 'flex';
+  resetModalUI(false); 
+  const res = await fetch(item.json); const data = await res.json();
+  currentOriginalText = data.map(d => d.text).join(' ');
+  $('fullscreenContent').innerHTML = data[0].text;
+  $('fullAudio').src = item.audio;
+  $('fullAudio').play();
+  if(recognition) recognition.lang = (item.type === 'es') ? 'es-ES' : 'en-US';
+}
+
+function resetModalUI(shouldPlayTeacher = false) {
+    if(mRec && mRec.state !== 'inactive') mRec.stop();
+    if(recognition) try { recognition.stop(); } catch(e) {}
+    $('scoreText').textContent = "Ready to check?";
+    $('scoreBar').style.width = '0%';
+    $('recognitionResult').textContent = "Click RECORD and speak...";
+    $('startRec').disabled = false; $('stopRec').disabled = true; $('playRec').disabled = true;
+    if(shouldPlayTeacher) { $('fullAudio').currentTime = 0; $('fullAudio').play(); }
+}
+
+$('startRec').onclick = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mRec = new MediaRecorder(stream); chunks = [];
+    $('recognitionResult').textContent = "Listening...";
+    mRec.ondataavailable = e => chunks.push(e.data);
+    mRec.onstop = () => {
+      const b = new Blob(chunks, { type: 'audio/webm' });
+      $('playBack').src = URL.createObjectURL(b);
+      $('playRec').disabled = false;
+    };
+    if(recognition) {
+      recognition.start();
+      recognition.onresult = (event) => {
+        const heard = event.results[0][0].transcript;
+        const score = calculateAccuracy(currentOriginalText, heard);
+        $('scoreBar').style.width = score + '%';
+        $('scoreText').textContent = `Accuracy: ${score}%`;
+        $('recognitionResult').innerHTML = `System heard: <br>"${heard}"`;
+      };
+    }
+    mRec.start(); $('startRec').disabled = true; $('stopRec').disabled = false;
+  } catch(e) { alert("Mic error."); }
+};
+
+$('stopRec').onclick = () => { mRec.stop(); if(recognition) try { recognition.stop(); } catch(e) {} };
+$('playRec').onclick = () => $('playBack').play();
+$('listenTeacherBtn').onclick = () => { $('fullAudio').currentTime = 0; $('fullAudio').play(); };
+$('refreshModalBtn').onclick = () => resetModalUI(false);
+
+function stopEverything() {
+  isPlayingAll = false; isPaused = false; seqAudio.pause(); $('fullAudio').pause(); 
+  $('shadowingPause').style.display = 'none'; $('fullscreenModal').style.display = 'none';
+  clearInterval(cInterval); if(recognition) try { recognition.stop(); } catch(e) {}
+}
+
+$('playAllButton').onclick = () => { stopEverything(); activeSeq = order; isPlayingAll = true; curIdx = 0; playNext(); };
+$('playESButton').onclick = () => { stopEverything(); activeSeq = order.filter(o=>o.type==='es'); isPlayingAll = true; curIdx = 0; playNext(); };
+$('playENButton').onclick = () => { stopEverything(); activeSeq = order.filter(o=>o.type==='z'); isPlayingAll = true; curIdx = 0; playNext(); };
+$('resetAllButton').onclick = () => location.reload();
+$('fullscreenClose').onclick = () => stopEverything();
+$('shaNextBtn').onclick = () => { clearInterval(cInterval); $('shadowingPause').style.display = 'none'; curIdx++; playNext(); };
+$('shaCloseBtn').onclick = () => stopEverything();
+
+function playNext(){
+  if(!isPlayingAll || curIdx >= activeSeq.length || isPaused) return;
+  const item = activeSeq[curIdx];
+  const idx = order.findIndex(o => o.audio === item.audio);
+  const allP = document.querySelectorAll('.player');
+  allP.forEach((p, i) => i < idx ? p.classList.add('is-past') : p.classList.remove('is-past'));
+  if (allP[idx]) allP[idx].scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  seqAudio.src = item.audio;
+  seqAudio.onplay = () => {
+      function hLoop(){
+          if(seqAudio.paused) return;
+          playerControls[idx].spans.forEach(s => {
+              if(seqAudio.currentTime >= s.dataset.start && seqAudio.currentTime <= s.dataset.end)
+                  s.style.color = (s.dataset.type === 'z') ? 'var(--red)' : 'var(--gold)';
+              else if(seqAudio.currentTime > s.dataset.end) { s.classList.add('completed'); s.style.color = ''; }
+          });
+          requestAnimationFrame(hLoop);
+      }
+      requestAnimationFrame(hLoop);
+  };
+  seqAudio.onended = () => {
+    let rem = Math.ceil(seqAudio.duration * 1.5);
+    $('pauseLine').innerHTML = '';
+    playerControls[idx].spans.forEach(s => { const c = document.createElement('span'); c.textContent = s.textContent; $('pauseLine').appendChild(c); });
+    $('shadowingPause').style.display = 'flex';
+    clearInterval(cInterval);
+    cInterval = setInterval(() => {
+      if(!isPaused) { rem--; $('pauseTimer').textContent = rem; if(rem <= 0) { clearInterval(cInterval); $('shadowingPause').style.display = 'none'; curIdx++; playNext(); } }
+    }, 1000);
+  };
+  seqAudio.play();
+}
+
+init();
+</script>
+</body>
+</html>
