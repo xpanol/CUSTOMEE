@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>BILINGUAL SELF-LEARNING APP - FOCUS MODE</title>
+    <title>BILINGUAL SELF-LEARNING APP - FULL PRO MODE</title>
     <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Inter:wght@300;400;700;900&family=Montserrat:wght@300;400;700;800&family=Bebas+Neue&family=Syncopate:wght@400;700&family=Ubuntu:wght@300;400;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -12,6 +12,7 @@
             --header-text-color: #ffffff;
             --modal-text-color: #ffffff;
             --brand-border: #F8AC10;
+            --btn-border-color: #F8AC10;
             --color-es: #F8AC10;
             --color-en: #f03246;
             --color-done: #555555;
@@ -28,13 +29,14 @@
             --card-radius: 12px;
             
             --bg-image: none;
-            --bg-overlay: rgba(0,0,0,0.8);
             --bg-blur: 0px;
             --bg-brightness: 100%;
-            --bg-size: cover;
+            --bg-size-val: cover;
             --bg-pos-x: center;
             --bg-pos-y: center;
-            --bg-repeat: no-repeat;
+
+            --logo-scale: 100px;
+            --logo-margin: 10px;
         }
 
         body {
@@ -49,14 +51,12 @@
         #bg-layer {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-image: var(--bg-image);
-            background-size: var(--bg-size); 
+            background-size: var(--bg-size-val); 
             background-position: var(--bg-pos-x) var(--bg-pos-y);
-            background-repeat: var(--bg-repeat);
+            background-repeat: no-repeat;
             filter: blur(var(--bg-blur)) brightness(var(--bg-brightness));
-            z-index: -2;
+            z-index: -1;
         }
-
-        #bg-mask { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-overlay); z-index: -1; pointer-events: none; }
 
         #brandingToggle { 
             position: fixed; top: 20px; right: 20px; z-index: 2000; 
@@ -65,10 +65,11 @@
         }
 
         #brandingPanel {
-            position: fixed; top: 0; right: -460px; width: 420px; height: 100%; 
+            position: fixed; top: 0; right: -460px; width: 420px; height: 100vh; 
             background: #0d0d0d; z-index: 3000; padding: 40px 30px; 
             transition: 0.5s ease-in-out; box-shadow: -30px 0 80px rgba(0,0,0,0.9);
             overflow-y: auto; color: #fff; border-left: 1px solid #333;
+            box-sizing: border-box;
         }
         #brandingPanel.open { right: 0; }
 
@@ -85,7 +86,7 @@
             z-index: 1000; height: var(--header-height); border-bottom: 2px solid var(--brand-border);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
-        #companyLogo { max-height: 50px; margin-bottom: 10px; display: none; }
+        #companyLogo { max-height: var(--logo-scale); width: auto; margin-bottom: var(--logo-margin); display: none; }
         #companyName { font-family: var(--head-font); font-size: var(--header-font-size); color: var(--header-text-color); text-transform: uppercase; margin: 0; text-align: center; }
 
         #buttonsContainer { display: flex; gap: 8px; margin-top: 15px; flex-wrap: wrap; justify-content: center; }
@@ -93,25 +94,23 @@
         .main-btn {
             background: transparent; color: inherit; 
             padding: calc(10px * var(--btn-scale)) calc(20px * var(--btn-scale)); 
-            border: var(--btn-border-w) solid var(--brand-border); cursor: pointer; font-family: inherit; 
+            border: var(--btn-border-w) solid var(--btn-border-color); cursor: pointer; font-family: inherit; 
             font-size: calc(12px * var(--btn-scale)); border-radius: var(--card-radius); transition: 0.2s;
             text-transform: uppercase;
         }
-        .main-btn:hover { background: var(--brand-border); color: #000; }
+        .main-btn:hover { background: var(--btn-border-color); color: #000; }
 
-        #players { max-width: 900px; margin: calc(var(--header-height) + 60px) auto 100px auto; padding: 20px; transition: margin-top 0.3s; }
-        .player { margin-bottom: 40px; padding: 30px; background: transparent; border: none; }
+        #players { max-width: 900px; margin: calc(var(--header-height) + 60px) auto 100px auto; padding: 20px; position: relative; z-index: 10; }
+        .player { margin-bottom: 40px; padding: 30px; background: transparent; }
         .player-ui { display: flex; align-items: center; gap: 25px; }
-        .play-btn { background: none; border: var(--btn-border-w) solid var(--brand-border); color: inherit; width: 60px; height: 60px; border-radius: 50%; cursor: pointer; font-size: 22px; transition: 0.2s; }
+        .play-btn { background: none; border: var(--btn-border-w) solid var(--btn-border-color); color: inherit; width: 60px; height: 60px; border-radius: 50%; cursor: pointer; font-size: 22px; transition: 0.2s; }
 
         .karaoke-line { font-size: var(--karaoke-size); line-height: 1.4; transition: 0.2s; color: var(--brand-text); }
         .karaoke-line span { transition: color 0.1s; }
-        
-        /* Done Logic: Change entire sentence color */
-        .player-done .karaoke-line { color: var(--color-done) !important; opacity: 0.7; }
+        .player-done .karaoke-line { color: var(--color-done) !important; opacity: 0.8; }
         .player-done .karaoke-line span { color: inherit !important; }
 
-        #visualizerCanvas { width: 100%; max-width: 400px; height: 60px; margin: 20px 0; border: 1px solid var(--brand-border); }
+        #visualizerCanvas { width: 100%; max-width: 400px; height: 80px; margin: 20px 0; border-bottom: 2px solid var(--brand-border); background: rgba(255,255,255,0.05); }
 
         .modal { 
             display:none; position:fixed; inset:0; background:var(--brand-bg); 
@@ -119,95 +118,93 @@
         }
         #shaText, #retoText { font-family: var(--main-font); color: var(--modal-text-color); }
         #shaTimer { font-size: 150px; font-weight: 900; color: var(--modal-text-color); }
-        .is-recording-btn { background: var(--color-en) !important; }
+        #systemHeard { font-size: 14px; color: var(--brand-border); margin-top: 10px; font-style: italic; opacity: 0.8; }
+        .is-recording-btn { background: var(--color-en) !important; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 
 <div id="bg-layer"></div>
-<div id="bg-mask"></div>
-<button id="brandingToggle">⚙ DESIGN STUDIO</button>
+<button id="brandingToggle">⚙ BRANDING</button>
 
 <div id="brandingPanel">
-    <button style="float:right; background:none; border:none; color:#555; font-size:24px; cursor:pointer;" onclick="document.getElementById('brandingPanel').classList.remove('open')">×</button>
-    <h2 style="letter-spacing:5px; margin-bottom:25px; color:var(--brand-border);">DESIGN STUDIO</h2>
+    <button style="float:right; background:none; border:none; color:#555; font-size:24px; cursor:pointer;" onclick="$('brandingPanel').classList.remove('open')">×</button>
+    <h2 style="letter-spacing:5px; margin-bottom:25px; color:var(--brand-border);">BRANDING</h2>
     
     <div class="b-section">
         <h3>1. Identity & Logo</h3>
-        <div class="b-row"><label>Company Name</label><input type="text" id="inCompName" value="MARKETING DIGITAL" oninput="updateBranding()"></div>
+        <div class="b-row"><label>Company Name</label><input type="text" id="inCompName" value="FRASAL KARAOKE" oninput="updateBranding()"></div>
         <div class="b-row"><label>Logo URL</label><input type="text" id="inLogoUrl" placeholder="https://..." oninput="updateBranding()"></div>
+        <div class="b-row"><label>Logo Scale (px)</label><input type="range" id="rgLogoScale" min="20" max="600" value="100" oninput="updateBranding()"></div>
+        <div class="b-row"><label>Logo V-Offset</label><input type="range" id="rgLogoMargin" min="-200" max="400" value="10" oninput="updateBranding()"></div>
     </div>
 
     <div class="b-section">
         <h3>2. Background Advanced</h3>
-        <div class="b-row"><label>Image URL</label><input type="text" id="inBgUrl" oninput="updateBranding()"></div>
-        <div class="b-row"><label>BG Size (%)</label><input type="range" id="rgBgSize" min="10" max="300" value="100" oninput="updateBranding()"></div>
-        <div class="b-row"><label>Pos X (%)</label><input type="range" id="rgBgPosX" min="0" max="100" value="50" oninput="updateBranding()"></div>
-        <div class="b-row"><label>Pos Y (%)</label><input type="range" id="rgBgPosY" min="0" max="100" value="50" oninput="updateBranding()"></div>
-        <div class="b-row"><label>Brightness</label><input type="range" id="rgBright" min="0" max="150" value="100" oninput="updateBranding()"></div>
-        <div class="b-row"><label>Blur</label><input type="range" id="rgBlur" min="0" max="20" value="0" oninput="updateBranding()"></div>
+        <div class="b-row"><label>BG Image URL</label><input type="text" id="inBgUrl" placeholder="Paste link" oninput="updateBranding()"></div>
+        <div class="b-row"><label>BG Image Size (%)</label><input type="range" id="rgBgSize" min="10" max="1000" value="100" oninput="updateBranding()"></div>
+        <div class="b-row"><label>Pos X (%)</label><input type="range" id="rgBgPosX" min="-100" max="200" value="50" oninput="updateBranding()"></div>
+        <div class="b-row"><label>Pos Y (%)</label><input type="range" id="rgBgPosY" min="-300" max="400" value="50" oninput="updateBranding()"></div>
+        <div class="b-row"><label>Brightness (%)</label><input type="range" id="rgBright" min="0" max="200" value="100" oninput="updateBranding()"></div>
+        <div class="b-row"><label>Blur (px)</label><input type="range" id="rgBlur" min="0" max="50" value="0" oninput="updateBranding()"></div>
     </div>
 
     <div class="b-section">
-        <h3>3. UI Colors</h3>
-        <div class="b-row"><label>Main Text</label><input type="color" id="cpMainText" value="#ffffff" oninput="updateBranding()"></div>
-        <div class="b-row"><label>Header Text</label><input type="color" id="cpHeaderText" value="#ffffff" oninput="updateBranding()"></div>
-        <div class="b-row"><label>Modal Text</label><input type="color" id="cpModalText" value="#ffffff" oninput="updateBranding()"></div>
-        <div class="b-row"><label>Page BG</label><input type="color" id="cpBg" value="#000000" oninput="updateBranding()"></div>
-        <div class="b-row"><label>Header BG</label><input type="color" id="cpHeadBg" value="#000000" oninput="updateBranding()"></div>
-        <div class="b-row"><label>Accent Color</label><input type="color" id="cpBorder" value="#F8AC10" oninput="updateBranding()"></div>
+        <h3>3. Interface Colors</h3>
+        <div class="b-row"><label>Main Background</label><input type="color" id="cpBg" value="#000000" oninput="updateBranding()"></div>
+        <div class="b-row"><label>Header Background</label><input type="color" id="cpHeadBg" value="#000000" oninput="updateBranding()"></div>
+        <div class="b-row"><label>Header Border</label><input type="color" id="cpBorder" value="#F8AC10" oninput="updateBranding()"></div>
     </div>
 
     <div class="b-section">
-        <h3>4. Typography Engine</h3>
+        <h3>4. Typography Settings</h3>
         <div class="b-row"><label>Header Font</label>
-            <select id="inHeadFont" onchange="updateBranding()">
-                <option value="'Special Elite'">Special Elite</option>
-                <option value="'Montserrat'">Montserrat</option>
-                <option value="'Bebas Neue'">Bebas Neue</option>
-                <option value="'Syncopate'">Syncopate</option>
-                <option value="'Inter'">Inter</option>
+            <select id="selHeadFont" onchange="updateBranding()">
+                <option value="'Special Elite', cursive">Special Elite</option>
+                <option value="'Inter', sans-serif">Inter</option>
+                <option value="'Bebas Neue', sans-serif">Bebas Neue</option>
+                <option value="'Montserrat', sans-serif">Montserrat</option>
+                <option value="'Syncopate', sans-serif">Syncopate</option>
             </select>
         </div>
+        <div class="b-row"><label>Header Color</label><input type="color" id="cpHeadText" value="#ffffff" oninput="updateBranding()"></div>
+        <div class="b-row"><label>Header Size</label><input type="range" id="rgHeadFontSize" min="10" max="200" value="44" oninput="updateBranding()"></div>
+        
         <div class="b-row"><label>Body Font</label>
-            <select id="inMainFont" onchange="updateBranding()">
-                <option value="'Special Elite'">Special Elite</option>
-                <option value="'Inter'">Inter</option>
-                <option value="'Roboto Mono'">Roboto Mono</option>
-                <option value="'Ubuntu'">Ubuntu</option>
+            <select id="selBodyFont" onchange="updateBranding()">
+                <option value="'Special Elite', cursive">Special Elite</option>
+                <option value="'Inter', sans-serif">Inter</option>
+                <option value="'Ubuntu', sans-serif">Ubuntu</option>
+                <option value="'Roboto Mono', monospace">Roboto Mono</option>
             </select>
         </div>
-        <div class="b-row"><label>Header Height</label><input type="range" id="rgHeadHeight" min="60" max="400" value="180" oninput="updateBranding()"></div>
-        <div class="b-row"><label>Header Font Size</label><input type="range" id="rgHeadFontSize" min="10" max="120" value="44" oninput="updateBranding()"></div>
-        <div class="b-row"><label>Body Size</label><input type="range" id="rgMainSize" min="10" max="40" value="16" oninput="updateBranding()"></div>
-        <div class="b-row"><label>Karaoke Size</label><input type="range" id="rgKaraSize" min="10" max="80" value="32" oninput="updateBranding()"></div>
+        <div class="b-row"><label>Body Text Color</label><input type="color" id="cpMainText" value="#ffffff" oninput="updateBranding()"></div>
+        <div class="b-row"><label>Body Text Size</label><input type="range" id="rgMainSize" min="8" max="60" value="16" oninput="updateBranding()"></div>
+        <div class="b-row"><label>Karaoke ES Color</label><input type="color" id="cpEsColor" value="#F8AC10" oninput="updateBranding()"></div>
+        <div class="b-row"><label>Karaoke EN Color</label><input type="color" id="cpEnColor" value="#f03246" oninput="updateBranding()"></div>
+        <div class="b-row"><label>Karaoke Done Color</label><input type="color" id="cpDoneColor" value="#555555" oninput="updateBranding()"></div>
+        <div class="b-row"><label>Karaoke Text Size</label><input type="range" id="rgKaraSize" min="10" max="120" value="32" oninput="updateBranding()"></div>
     </div>
 
     <div class="b-section">
-        <h3>5. Buttons Style</h3>
-        <div class="b-row"><label>Scale</label><input type="range" id="rgBtnScale" min="0.5" max="3.0" step="0.1" value="1.0" oninput="updateBranding()"></div>
-        <div class="b-row"><label>Border Width</label><input type="range" id="rgBtnBorder" min="0" max="15" value="1" oninput="updateBranding()"></div>
-        <div class="b-row"><label>Radius</label><input type="range" id="rgRad" min="0" max="60" value="12" oninput="updateBranding()"></div>
+        <h3>5. Buttons & Layout</h3>
+        <div class="b-row"><label>Header Height</label><input type="range" id="rgHeadHeight" min="60" max="800" value="180" oninput="updateBranding()"></div>
+        <div class="b-row"><label>Buttons Color</label><input type="color" id="cpBtnBorder" value="#F8AC10" oninput="updateBranding()"></div>
+        <div class="b-row"><label>Buttons Scale</label><input type="range" id="rgBtnScale" min="0.5" max="4" step="0.1" value="1.0" oninput="updateBranding()"></div>
     </div>
 
-    <div class="b-section">
-        <h3>6. Karaoke Colors</h3>
-        <div class="b-row"><label>Spanish Active</label><input type="color" id="cpES" value="#F8AC10" oninput="updateBranding()"></div>
-        <div class="b-row"><label>English Active</label><input type="color" id="cpEN" value="#f03246" oninput="updateBranding()"></div>
-        <div class="b-row"><label>Done Text</label><input type="color" id="cpDone" value="#555555" oninput="updateBranding()"></div>
-    </div>
-
-    <button class="main-btn" style="width:100%; font-weight:bold;" onclick="document.getElementById('brandingPanel').classList.remove('open')">SAVE & CLOSE</button>
+    <button class="main-btn" style="width:100%; font-weight:bold; margin-bottom: 40px;" onclick="$('brandingPanel').classList.remove('open')">CLOSE AND SAVE</button>
 </div>
 
 <div id="stickyHeader">
     <img id="companyLogo" src="" alt="logo">
-    <h1 id="companyName">MARKETING DIGITAL</h1>
+    <h1 id="companyName">FRASAL KARAOKE</h1>
     <div id="buttonsContainer">
         <button onclick="startSequence('all')" class="main-btn">PLAY ALL</button>
         <button onclick="startSequence('es')" class="main-btn">SPANISH</button>
         <button onclick="startSequence('en')" class="main-btn">ENGLISH</button>
-        <button onclick="location.reload()" class="main-btn">↻ REFRESH</button>
+        <button onclick="resetPlayers()" class="main-btn">↻ REFRESH</button>
         <button id="stopBtn" class="main-btn" style="color:var(--color-en); border-color:var(--color-en);">🛑 STOP</button>
     </div>
 </div>
@@ -215,11 +212,13 @@
 <div id="players"></div>
 
 <div id="modalRETO" class="modal">
-    <div id="retoText" style="font-size:32px; text-align:center; max-width:850px; margin-bottom:20px; padding:0 20px;"></div>
+    <div id="retoText" style="font-size:32px; text-align:center; max-width:850px; margin-bottom:10px; padding:0 20px;"></div>
+    <div id="systemHeard">System heard: "..."</div>
     <canvas id="visualizerCanvas"></canvas>
     <div id="accuracyText" style="font-size:100px; font-weight:900;">0%</div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:30px; width:500px; max-width:90%;">
         <button id="startRec" class="main-btn" style="grid-column:span 2; padding:20px;">🎤 START RECORDING</button>
+        <button id="playRecBtn" class="main-btn" style="grid-column:span 2; padding:15px; display:none; border-color:#4CAF50; color:#4CAF50;">👂 PLAY MY RECORDING</button>
         <button class="main-btn" onclick="closeReto()" style="grid-column:span 2; opacity:0.5;">BACK</button>
     </div>
 </div>
@@ -234,45 +233,76 @@
 const $ = id => document.getElementById(id);
 const BASE_URL = 'https://raw.githubusercontent.com/xpanol/PLAYERS/main/';
 const TRACK_COUNT = 30;
-let playerControls = [], curIdx = 0, isSeq = false, animId;
+let playerControls = [], curIdx = 0, isSeq = false;
 const mainAudio = new Audio();
+
+// Recording variables
+let mediaRecorder;
+let audioChunks = [];
+let recordedUrl = null;
+const reviewAudio = new Audio();
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const recognition = SpeechRecognition ? new SpeechRecognition() : null;
+let audioCtx, analyser, dataArray, source;
+
+function resetPlayers() {
+    isSeq = false;
+    mainAudio.pause();
+    mainAudio.currentTime = 0;
+    playerControls.forEach(p => {
+        p.div.classList.remove('player-done');
+        p.rBtn.style.display = "none";
+        p.spans.forEach(s => s.style.color = 'inherit');
+    });
+    window.scrollTo({top: 0, behavior: 'smooth'});
+}
 
 function updateBranding() {
     const root = document.documentElement;
     $('companyName').textContent = $('inCompName').value;
+    
     if($('inLogoUrl').value) {
         $('companyLogo').src = $('inLogoUrl').value;
         $('companyLogo').style.display = 'block';
     } else {
         $('companyLogo').style.display = 'none';
     }
-    root.style.setProperty('--brand-text', $('cpMainText').value);
-    root.style.setProperty('--header-text-color', $('cpHeaderText').value);
-    root.style.setProperty('--modal-text-color', $('cpModalText').value);
+
+    if($('inBgUrl').value.trim() !== "") {
+        root.style.setProperty('--bg-image', `url('${$('inBgUrl').value}')`);
+        root.style.setProperty('--bg-size-val', $('rgBgSize').value + '%');
+    } else {
+        root.style.setProperty('--bg-image', 'none');
+    }
+    root.style.setProperty('--bg-brightness', $('rgBright').value + '%');
+    root.style.setProperty('--bg-blur', $('rgBlur').value + 'px');
+    root.style.setProperty('--bg-pos-x', $('rgBgPosX').value + '%');
+    root.style.setProperty('--bg-pos-y', $('rgBgPosY').value + '%');
+
     root.style.setProperty('--brand-bg', $('cpBg').value);
     root.style.setProperty('--brand-header-bg', $('cpHeadBg').value);
     root.style.setProperty('--brand-border', $('cpBorder').value);
-    root.style.setProperty('--color-es', $('cpES').value);
-    root.style.setProperty('--color-en', $('cpEN').value);
-    root.style.setProperty('--color-done', $('cpDone').value);
-    root.style.setProperty('--header-height', $('rgHeadHeight').value + 'px');
+    
+    root.style.setProperty('--head-font', $('selHeadFont').value);
+    root.style.setProperty('--header-text-color', $('cpHeadText').value);
     root.style.setProperty('--header-font-size', $('rgHeadFontSize').value + 'px');
+    
+    root.style.setProperty('--main-font', $('selBodyFont').value);
+    root.style.setProperty('--brand-text', $('cpMainText').value);
     root.style.setProperty('--main-text-size', $('rgMainSize').value + 'px');
     root.style.setProperty('--karaoke-size', $('rgKaraSize').value + 'px');
-    root.style.setProperty('--head-font', $('inHeadFont').value);
-    root.style.setProperty('--main-font', $('inMainFont').value);
+
+    root.style.setProperty('--color-es', $('cpEsColor').value);
+    root.style.setProperty('--color-en', $('cpEnColor').value);
+    root.style.setProperty('--color-done', $('cpDoneColor').value);
+
+    root.style.setProperty('--header-height', $('rgHeadHeight').value + 'px');
+    root.style.setProperty('--btn-border-color', $('cpBtnBorder').value);
     root.style.setProperty('--btn-scale', $('rgBtnScale').value);
-    root.style.setProperty('--btn-border-w', $('rgBtnBorder').value + 'px');
-    root.style.setProperty('--card-radius', $('rgRad').value + 'px');
-    root.style.setProperty('--bg-brightness', $('rgBright').value + '%');
-    root.style.setProperty('--bg-blur', $('rgBlur').value + 'px');
-    root.style.setProperty('--bg-size', $('rgBgSize').value + '%');
-    root.style.setProperty('--bg-pos-x', $('rgBgPosX').value + '%');
-    root.style.setProperty('--bg-pos-y', $('rgBgPosY').value + '%');
-    if($('inBgUrl').value) root.style.setProperty('--bg-image', `url(${$('inBgUrl').value})`);
+    root.style.setProperty('--logo-scale', $('rgLogoScale').value + 'px');
+    root.style.setProperty('--logo-margin', $('rgLogoMargin').value + 'px');
+    
     $('players').style.marginTop = (parseInt($('rgHeadHeight').value) + 60) + 'px';
 }
 
@@ -307,44 +337,91 @@ async function addPlayer(aUrl, jUrl, type) {
     } catch(e) {}
 }
 
-async function init() {
-    for(let i=1; i<=TRACK_COUNT; i++) {
-        const n = String(i).padStart(3,'0');
-        await addPlayer(BASE_URL+n+'_es.mp3', BASE_URL+n+'_es.json', 'es');
-        await addPlayer(BASE_URL+'Z'+n+'_en.mp3', BASE_URL+'Z'+n+'_en.json', 'en');
-    }
-}
-
-// [X] Foco dinámico: Palabra activa brilla, las demás vuelven a base
 function play(p) {
     curIdx = playerControls.indexOf(p);
     p.div.classList.remove('player-done');
     mainAudio.src = p.audio; mainAudio.play();
     const clr = p.type === 'es' ? 'var(--color-es)' : 'var(--color-en)';
-    
     const anim = () => {
         if(mainAudio.paused) return;
         const time = mainAudio.currentTime;
         p.spans.forEach(s => {
             const start = parseFloat(s.dataset.start);
             const end = parseFloat(s.dataset.end);
-            // Si el tiempo actual está en el rango de la palabra, pintar. Si no, color inherit (base).
-            if(time >= start && time <= end) {
-                s.style.color = clr;
-            } else {
-                s.style.color = 'inherit';
-            }
+            s.style.color = (time >= start && time <= end) ? clr : 'inherit';
         });
         requestAnimationFrame(anim);
     };
     requestAnimationFrame(anim);
-    
     mainAudio.onended = () => {
-        p.div.classList.add('player-done'); // Aplica color "Done" a toda la frase
+        p.div.classList.add('player-done');
         p.rBtn.style.display = "inline-block";
         if(isSeq) startShadowing(p.text);
     };
 }
+
+function startVisualizer(stream) {
+    if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); analyser = audioCtx.createAnalyser(); analyser.fftSize = 64; }
+    if(source) source.disconnect();
+    source = audioCtx.createMediaStreamSource(stream); source.connect(analyser); draw();
+}
+
+function draw() {
+    const canvas = $('visualizerCanvas'); const ctx = canvas.getContext('2d');
+    const bufferLength = analyser.frequencyBinCount; dataArray = new Uint8Array(bufferLength);
+    function render() {
+        if ($('modalRETO').style.display === 'none') return;
+        requestAnimationFrame(render); analyser.getByteFrequencyData(dataArray);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let x = 0; const barWidth = (canvas.width / bufferLength) * 2;
+        for (let i = 0; i < bufferLength; i++) {
+            const barHeight = (dataArray[i] / 255) * canvas.height;
+            ctx.fillStyle = $('cpBorder').value; ctx.fillRect(x, canvas.height - barHeight, barWidth - 2, barHeight);
+            x += barWidth;
+        }
+    }
+    render();
+}
+
+if(recognition) {
+    $('startRec').onclick = async () => { 
+        audioChunks = [];
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        // Start Recognition
+        recognition.start(); 
+        startVisualizer(stream); 
+        $('startRec').classList.add('is-recording-btn');
+        $('playRecBtn').style.display = 'none';
+
+        // Start Media Recording for playback
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(audioChunks, { type: 'audio/ogg; codecs=opus' });
+            recordedUrl = URL.createObjectURL(blob);
+            reviewAudio.src = recordedUrl;
+            $('playRecBtn').style.display = 'block';
+        };
+        mediaRecorder.start();
+    };
+
+    recognition.onresult = (e) => {
+        const heard = e.results[0][0].transcript.toLowerCase();
+        $('systemHeard').textContent = `System heard: "${heard}"`;
+        const original = playerControls[curIdx].text.toLowerCase().split(' ');
+        const matched = original.filter(w => heard.includes(w.replace(/[.,!]/g,''))).length;
+        $('accuracyText').textContent = Math.round((matched / original.length) * 100) + '%';
+        if(mediaRecorder) mediaRecorder.stop();
+    };
+    
+    recognition.onend = () => {
+        $('startRec').classList.remove('is-recording-btn');
+        if(mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
+    };
+}
+
+$('playRecBtn').onclick = () => { if(recordedUrl) reviewAudio.play(); };
 
 function startShadowing(txt) {
     $('modalSHA').style.display = 'flex'; $('shaText').textContent = txt;
@@ -354,55 +431,44 @@ function startShadowing(txt) {
         if(t <= 0 || !isSeq) { clearInterval(itv); $('modalSHA').style.display = 'none'; if(isSeq) nextInSeq(); }
     }, 1000);
 }
-
 function nextInSeq() {
     curIdx++;
     while(curIdx < playerControls.length && playerControls[curIdx].div.style.display === 'none') curIdx++;
-    if(curIdx < playerControls.length) { 
-        playerControls[curIdx].div.scrollIntoView({behavior:'smooth', block:'center'}); 
-        play(playerControls[curIdx]); 
-    }
+    if(curIdx < playerControls.length) { playerControls[curIdx].div.scrollIntoView({behavior:'smooth', block:'center'}); play(playerControls[curIdx]); }
 }
+function startSequence(type) { isSeq = true; playerControls.forEach(p => p.div.style.display = (type==='all' || p.type===type) ? 'block' : 'none'); curIdx = -1; nextInSeq(); }
 
-function startSequence(type) {
-    isSeq = true;
-    playerControls.forEach(p => p.div.style.display = (type==='all' || p.type===type) ? 'block' : 'none');
-    curIdx = -1; nextInSeq();
-}
+function openReto(p) { 
+    curIdx = playerControls.indexOf(p); 
+    // RESET RESULTS
+    $('systemHeard').textContent = 'System heard: "..."';
+    $('accuracyText').textContent = '0%';
+    $('playRecBtn').style.display = 'none';
+    recordedUrl = null;
 
-function openReto(p) {
-    curIdx = playerControls.indexOf(p);
-    $('modalRETO').style.display = 'flex';
-    $('retoText').textContent = p.text;
-    if(recognition) recognition.lang = p.type === 'es' ? 'es-ES' : 'en-US';
+    $('modalRETO').style.display = 'flex'; 
+    $('retoText').textContent = p.text; 
+    if(recognition) recognition.lang = p.type === 'es' ? 'es-ES' : 'en-US'; 
 }
 
 function closeReto() { 
     $('modalRETO').style.display = 'none'; 
-    if(recognition) recognition.stop();
-}
-
-if(recognition) {
-    $('startRec').onclick = () => {
-        recognition.start();
-        $('startRec').classList.add('is-recording-btn');
-    };
-    recognition.onresult = (e) => {
-        const heard = e.results[0][0].transcript.toLowerCase();
-        const original = playerControls[curIdx].text.toLowerCase().split(' ');
-        const matched = original.filter(w => heard.includes(w.replace(/[.,!]/g,''))).length;
-        $('accuracyText').textContent = Math.round((matched / original.length) * 100) + '%';
-    };
-    recognition.onend = () => $('startRec').classList.remove('is-recording-btn');
+    if(recognition) recognition.stop(); 
+    if(mediaRecorder) mediaRecorder.stop();
+    reviewAudio.pause();
 }
 
 $('brandingToggle').onclick = () => $('brandingPanel').classList.toggle('open');
 $('stopBtn').onclick = () => { isSeq = false; mainAudio.pause(); $('modalSHA').style.display='none'; };
 
-document.addEventListener('DOMContentLoaded', () => {
-    init();
-    updateBranding();
-});
+async function init() {
+    for(let i=1; i<=TRACK_COUNT; i++) {
+        const n = String(i).padStart(3,'0');
+        await addPlayer(BASE_URL+n+'_es.mp3', BASE_URL+n+'_es.json', 'es');
+        await addPlayer(BASE_URL+'Z'+n+'_en.mp3', BASE_URL+'Z'+n+'_en.json', 'en');
+    }
+}
+document.addEventListener('DOMContentLoaded', () => { init(); updateBranding(); });
 </script>
 </body>
 </html>
