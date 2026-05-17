@@ -124,11 +124,6 @@
         .is-recording-btn { background: var(--color-en) !important; animation: pulse 1s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
     </style>
-
-    <script type="module">
-        import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
-        window.whisperPipeline = pipeline;
-    </script>
 </head>
 <body>
 
@@ -237,6 +232,38 @@
     <div id="shaTimer">5</div>
 </div>
 
+<script type="module">
+    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+    
+    let transcriber = null;
+
+    window.initWhisper = async function() {
+        if (transcriber) return;
+        document.getElementById('whisperStatus').textContent = "Loading Whisper AI Model (~75MB)... Please wait.";
+        document.getElementById('startRec').disabled = true;
+        try {
+            // Correct ASR identifier for modern transformers.js
+            transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en');
+            document.getElementById('whisperStatus').textContent = "Whisper AI Engine Loaded Successfully.";
+            document.getElementById('startRec').disabled = false;
+        } catch (err) {
+            document.getElementById('whisperStatus').textContent = "Failed to load Whisper AI. Check console for details.";
+            console.error(err);
+        }
+    }
+
+    window.runWhisperInference = async function(audioData) {
+        if (!transcriber) return "";
+        const output = await transcriber(audioData, {
+            chunk_length_s: 30,
+            stride_length_s: 5,
+            language: 'english',
+            task: 'transcribe',
+        });
+        return output.text;
+    }
+</script>
+
 <script>
 const $ = id => document.getElementById(id);
 const BASE_URL = 'https://raw.githubusercontent.com/xpanol/PLAYERS/main/';
@@ -251,26 +278,8 @@ let recordedUrl = null;
 let audioBlob = null;
 const reviewAudio = new Audio();
 
-// Whisper.js Variables
-let transcriber = null;
 let isRecording = false;
 let audioCtx, analyser, dataArray, source;
-
-// Initializing browser Whisper
-async function initWhisper() {
-    if (transcriber) return;
-    $('whisperStatus').textContent = "Loading Whisper AI Model (~75MB)... Please wait.";
-    $('startRec').disabled = true;
-    try {
-        // Use Xenova/whisper-tiny.en for absolute local accuracy on browser
-        transcriber = await window.whisperPipeline('speech-to-text', 'Xenova/whisper-tiny.en');
-        $('whisperStatus').textContent = "Whisper AI Engine Loaded Successfully.";
-        $('startRec').disabled = false;
-    } catch (err) {
-        $('whisperStatus').textContent = "Failed to load Whisper AI. Check secure HTTPS connection.";
-        console.error(err);
-    }
-}
 
 function resetPlayers() {
     isSeq = false;
@@ -409,7 +418,6 @@ function draw() {
     render();
 }
 
-// Audio Process for Whisper (Converts browser audio blob to 16khz float32 array required by Whisper AI)
 async function processAudioForWhisper(blob) {
     const buffer = await blob.arrayBuffer();
     const tempCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
@@ -417,10 +425,8 @@ async function processAudioForWhisper(blob) {
     return decoded.getChannelData(0);
 }
 
-// Recording Action Toggle
 $('startRec').onclick = async () => {
     if (!isRecording) {
-        // START RECORDING
         audioChunks = [];
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         startVisualizer(stream);
@@ -439,29 +445,22 @@ $('startRec').onclick = async () => {
             reviewAudio.src = recordedUrl;
             $('playRecBtn').style.display = 'block';
 
-            // Run client-side Whisper model inference
             $('whisperStatus').textContent = "Whisper AI is analyzing your speech locally...";
             const audioData = await processAudioForWhisper(audioBlob);
             
-            const output = await transcriber(audioData, {
-                chunk_length_s: 30,
-                stride_length_s: 5,
-                language: 'english',
-                task: 'transcribe',
-            });
+            // Execute the module-isolated function safely
+            const textResult = await window.runWhisperInference(audioData);
 
-            const heard = output.text.trim().toLowerCase();
-            $('systemHeard').textContent = `System heard: "${output.text}"`;
+            const heard = textResult.trim().toLowerCase();
+            $('systemHeard').textContent = `System heard: "${textResult}"`;
             $('whisperStatus').textContent = "Analysis completed.";
 
-            // Text Matching Logic for Accuracy Score
             const original = playerControls[curIdx].text.toLowerCase().split(' ');
             const matched = original.filter(w => heard.includes(w.replace(/[.,!]/g,''))).length;
             $('accuracyText').textContent = Math.round((matched / original.length) * 100) + '%';
         };
         mediaRecorder.start();
     } else {
-        // STOP RECORDING
         isRecording = false;
         $('startRec').classList.remove('is-recording-btn');
         $('startRec').textContent = "🎤 START RECORDING";
@@ -496,8 +495,9 @@ function openReto(p) {
     $('modalRETO').style.display = 'flex'; 
     $('retoText').textContent = p.text; 
     
-    // Initialize Browser AI Whisper when entering RETO mode
-    initWhisper();
+    if(window.initWhisper) {
+        window.initWhisper();
+    }
 }
 
 function closeReto() { 
