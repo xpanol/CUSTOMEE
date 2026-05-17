@@ -239,12 +239,12 @@
 
     window.initWhisper = async function() {
         if (transcriber) return;
-        document.getElementById('whisperStatus').textContent = "Loading Multilingual Whisper AI Model (~75MB)... Please wait.";
+        document.getElementById('whisperStatus').textContent = "Loading HQ Whisper Base Model (~140MB)... Please wait.";
         document.getElementById('startRec').disabled = true;
         try {
-            // Changed from 'Xenova/whisper-tiny.en' to multilingual 'Xenova/whisper-tiny'
-            transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny');
-            document.getElementById('whisperStatus').textContent = "Whisper Multilingual Engine Loaded.";
+            // Upgraded from whisper-tiny to whisper-base for high-accuracy multilingual recognition
+            transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-base');
+            document.getElementById('whisperStatus').textContent = "Whisper HQ Base Engine Loaded.";
             document.getElementById('startRec').disabled = false;
         } catch (err) {
             document.getElementById('whisperStatus').textContent = "Failed to load Whisper AI. Check browser console.";
@@ -258,8 +258,11 @@
             const output = await transcriber(audioData, {
                 chunk_length_s: 30,
                 stride_length_s: 5,
-                language: targetLanguage, // Dynamic: 'spanish' or 'english'
+                language: targetLanguage,
                 task: 'transcribe',
+                // Anti-hallucination configuration
+                temperature: 0.0, 
+                beam_size: 2      
             });
             return output.text;
         } catch (e) {
@@ -419,7 +422,6 @@ function draw() {
     render();
 }
 
-// REALTIME 16KHZ AUDIO INTERCEPTOR SYSTEM
 async function startRealtimeRecording(stream) {
     whisperAudioBuffer = []; 
     
@@ -484,15 +486,12 @@ $('startRec').onclick = async () => {
         try {
             const float32AudioSamples = new Float32Array(whisperAudioBuffer);
             
-            // Detect dynamic language based on active item context ('es' -> 'spanish', 'en' -> 'english')
             const currentTrackType = playerControls[curIdx].type;
             const targetLang = currentTrackType === 'es' ? 'spanish' : 'english';
 
-            // Run analysis passing language dynamically
             const textResult = await window.runWhisperInference(float32AudioSamples, targetLang);
 
             const finalPhrase = textResult ? textResult.trim() : "";
-            const heard = finalPhrase.toLowerCase();
             
             $('systemHeard').textContent = `System heard: "${finalPhrase || '(No speech detected)'}"`;
             $('whisperStatus').textContent = "Analysis completed.";
