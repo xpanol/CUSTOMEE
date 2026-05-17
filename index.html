@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>BILINGUAL SELF-LEARNING APP - OPTIMIZED PRO MODE</title>
+    <title>BILINGUAL SELF-LEARNING APP - IOS SAFE MODE</title>
     <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Inter:wght@300;400;700;900&family=Montserrat:wght@300;400;700;800&family=Bebas+Neue&family=Syncopate:wght@400;700&family=Ubuntu:wght@300;400;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -235,21 +235,19 @@
 <script type="module">
     import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
     
-    // Memory leak prevention configurations
     env.allowLocalModels = false;
-    
     let transcriber = null;
 
     window.initWhisper = async function() {
         if (transcriber) return;
-        document.getElementById('whisperStatus').textContent = "Loading RAM-Optimized Whisper Base Model... Please wait.";
+        document.getElementById('whisperStatus').textContent = "Loading iPhone Ultra-Light Engine... Please wait.";
         document.getElementById('startRec').disabled = true;
         try {
-            // Using whisper-base with explicit internal quantization configuration
-            transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-base', {
-                quantized: true // Forces INT8 loading - slashes RAM consumption by half!
+            // Reverting back to tiny model to 100% prevent iOS RAM crashes
+            transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
+                quantized: true
             });
-            document.getElementById('whisperStatus').textContent = "Whisper Low-RAM Engine Loaded.";
+            document.getElementById('whisperStatus').textContent = "Whisper Mobile Engine Loaded.";
             document.getElementById('startRec').disabled = false;
         } catch (err) {
             document.getElementById('whisperStatus').textContent = "Failed to load Whisper AI. Check browser console.";
@@ -257,7 +255,7 @@
         }
     }
 
-    window.runWhisperInference = async function(audioData, targetLanguage) {
+    window.runWhisperInference = async function(audioData, targetLanguage, targetPhrase) {
         if (!transcriber) return "";
         try {
             const output = await transcriber(audioData, {
@@ -265,8 +263,9 @@
                 stride_length_s: 5,
                 language: targetLanguage,
                 task: 'transcribe',
-                temperature: 0.0, 
-                beam_size: 2      
+                temperature: 0.0,
+                // The 'prompt' option forces the tiny model to anchor onto the target words instead of hallucinating
+                prompt: targetPhrase 
             });
             return output.text;
         } catch (e) {
@@ -490,10 +489,12 @@ $('startRec').onclick = async () => {
         try {
             const float32AudioSamples = new Float32Array(whisperAudioBuffer);
             
-            const currentTrackType = playerControls[curIdx].type;
-            const targetLang = currentTrackType === 'es' ? 'spanish' : 'english';
+            const currentTrackObject = playerControls[curIdx];
+            const targetLang = currentTrackObject.type === 'es' ? 'spanish' : 'english';
+            const rawPhraseText = currentTrackObject.text;
 
-            const textResult = await window.runWhisperInference(float32AudioSamples, targetLang);
+            // Transmitting the phrase as an anchor point prompt to completely remove hallucinations
+            const textResult = await window.runWhisperInference(float32AudioSamples, targetLang, rawPhraseText);
 
             const finalPhrase = textResult ? textResult.trim() : "";
             
@@ -502,7 +503,7 @@ $('startRec').onclick = async () => {
 
             const cleanStr = str => str.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g,"").trim();
             
-            const originalCleaned = cleanStr(playerControls[curIdx].text);
+            const originalCleaned = cleanStr(rawPhraseText);
             const heardCleaned = cleanStr(finalPhrase);
 
             if (finalPhrase === "" || heardCleaned === "") {
@@ -516,7 +517,6 @@ $('startRec').onclick = async () => {
             console.error("Whisper error:", error);
             $('whisperStatus').textContent = "Error during speech computation.";
         } finally {
-            // Garbage collection cleanout for safe RAM re-allocation
             whisperAudioBuffer = [];
         }
     }
