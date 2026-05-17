@@ -242,25 +242,30 @@
         document.getElementById('whisperStatus').textContent = "Loading Whisper AI Model (~75MB)... Please wait.";
         document.getElementById('startRec').disabled = true;
         try {
-            // Correct ASR identifier for modern transformers.js
+            // Initialize the automatic speech recognition task with whisper tiny
             transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en');
             document.getElementById('whisperStatus').textContent = "Whisper AI Engine Loaded Successfully.";
             document.getElementById('startRec').disabled = false;
         } catch (err) {
-            document.getElementById('whisperStatus').textContent = "Failed to load Whisper AI. Check console for details.";
+            document.getElementById('whisperStatus').textContent = "Failed to load Whisper AI. Check browser console.";
             console.error(err);
         }
     }
 
     window.runWhisperInference = async function(audioData) {
         if (!transcriber) return "";
-        const output = await transcriber(audioData, {
-            chunk_length_s: 30,
-            stride_length_s: 5,
-            language: 'english',
-            task: 'transcribe',
-        });
-        return output.text;
+        try {
+            const output = await transcriber(audioData, {
+                chunk_length_s: 30,
+                stride_length_s: 5,
+                language: 'english',
+                task: 'transcribe',
+            });
+            return output.text;
+        } catch (e) {
+            console.error("Inference failed", e);
+            return "";
+        }
     }
 </script>
 
@@ -437,27 +442,48 @@ $('startRec').onclick = async () => {
         $('systemHeard').textContent = 'Listening...';
         isRecording = true;
 
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
+        mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
+        
+        mediaRecorder.ondataavailable = (e) => {
+            if(e.data && e.data.size > 0) audioChunks.push(e.data);
+        };
+        
         mediaRecorder.onstop = async () => {
-            audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            audioBlob = new Blob(audioChunks, { type: mimeType });
             recordedUrl = URL.createObjectURL(audioBlob);
             reviewAudio.src = recordedUrl;
             $('playRecBtn').style.display = 'block';
 
             $('whisperStatus').textContent = "Whisper AI is analyzing your speech locally...";
-            const audioData = await processAudioForWhisper(audioBlob);
             
-            // Execute the module-isolated function safely
-            const textResult = await window.runWhisperInference(audioData);
+            try {
+                const audioData = await processAudioForWhisper(audioBlob);
+                const textResult = await window.runWhisperInference(audioData);
 
-            const heard = textResult.trim().toLowerCase();
-            $('systemHeard').textContent = `System heard: "${textResult}"`;
-            $('whisperStatus').textContent = "Analysis completed.";
+                const finalPhrase = textResult ? textResult.trim() : "";
+                const heard = finalPhrase.toLowerCase();
+                
+                $('systemHeard').textContent = `System heard: "${finalPhrase || '(No speech detected)'}"`;
+                $('whisperStatus').textContent = "Analysis completed.";
 
-            const original = playerControls[curIdx].text.toLowerCase().split(' ');
-            const matched = original.filter(w => heard.includes(w.replace(/[.,!]/g,''))).length;
-            $('accuracyText').textContent = Math.round((matched / original.length) * 100) + '%';
+                // Regex punctuation clean up for bulletproof phrase matching
+                const cleanStr = str => str.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g,"").trim();
+                
+                const originalCleaned = cleanStr(playerControls[curIdx].text);
+                const heardCleaned = cleanStr(finalPhrase);
+
+                if (finalPhrase === "" || heardCleaned === "") {
+                    $('accuracyText').textContent = '0%';
+                } else {
+                    const originalWords = originalCleaned.split(/\s+/);
+                    const matchedWords = originalWords.filter(w => heardCleaned.includes(w)).length;
+                    $('accuracyText').textContent = Math.round((matchedWords / originalWords.length) * 100) + '%';
+                }
+            } catch (error) {
+                console.error("Whisper error:", error);
+                $('whisperStatus').textContent = "Error during speech computation.";
+            }
         };
         mediaRecorder.start();
     } else {
