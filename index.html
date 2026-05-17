@@ -242,7 +242,6 @@
         document.getElementById('whisperStatus').textContent = "Loading Whisper AI Model (~75MB)... Please wait.";
         document.getElementById('startRec').disabled = true;
         try {
-            // Initialize the automatic speech recognition task with whisper tiny
             transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en');
             document.getElementById('whisperStatus').textContent = "Whisper AI Engine Loaded Successfully.";
             document.getElementById('startRec').disabled = false;
@@ -276,15 +275,17 @@ const TRACK_COUNT = 30;
 let playerControls = [], curIdx = 0, isSeq = false;
 const mainAudio = new Audio();
 
-// Recording variables
+// Audio Processing & Recorder Variables
 let mediaRecorder;
 let audioChunks = [];
 let recordedUrl = null;
-let audioBlob = null;
 const reviewAudio = new Audio();
 
 let isRecording = false;
-let audioCtx, analyser, dataArray, source;
+let audioCtx, analyser, dataArray, source, scriptProcessor;
+
+// Array containing real-time RAW 16khz audio samples directly targeted for Whisper
+let whisperAudioBuffer = []; 
 
 function resetPlayers() {
     isSeq = false;
@@ -400,12 +401,6 @@ function play(p) {
     };
 }
 
-function startVisualizer(stream) {
-    if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); analyser = audioCtx.createAnalyser(); analyser.fftSize = 64; }
-    if(source) source.disconnect();
-    source = audioCtx.createMediaStreamSource(stream); source.connect(analyser); draw();
-}
-
 function draw() {
     const canvas = $('visualizerCanvas'); const ctx = canvas.getContext('2d');
     const bufferLength = analyser.frequencyBinCount; dataArray = new Uint8Array(bufferLength);
@@ -423,74 +418,103 @@ function draw() {
     render();
 }
 
-async function processAudioForWhisper(blob) {
-    const buffer = await blob.arrayBuffer();
-    const tempCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-    const decoded = await tempCtx.decodeAudioData(buffer);
-    return decoded.getChannelData(0);
+// REALTIME 16KHZ AUDIO INTERCEPTOR SYSTEM
+async function startRealtimeRecording(stream) {
+    whisperAudioBuffer = []; // Reset real-time buffers
+    
+    // Create AudioContext matching system standard sampling rate
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 64;
+
+    source = audioCtx.createMediaStreamSource(stream);
+    source.connect(analyser);
+
+    // Create secondary offline resampler targeted exactly at 16000Hz for Whisper AI stability
+    const whisperContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    const whisperSource = whisperContext.createMediaStreamSource(stream);
+    
+    scriptProcessor = whisperContext.createScriptProcessor(4096, 1, 1);
+    whisperSource.connect(scriptProcessor);
+    scriptProcessor.connect(whisperContext.destination);
+
+    scriptProcessor.onaudioprocess = (event) => {
+        if (!isRecording) return;
+        const inputData = event.inputBuffer.getChannelData(0);
+        // Direct stream cloning into float32 arrays avoids compression artifacting
+        whisperAudioBuffer.push(...inputData); 
+    };
+
+    draw();
 }
 
 $('startRec').onclick = async () => {
     if (!isRecording) {
         audioChunks = [];
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        startVisualizer(stream);
         
+        isRecording = true;
         $('startRec').classList.add('is-recording-btn');
         $('startRec').textContent = "🛑 STOP & ANALYZE";
         $('playRecBtn').style.display = 'none';
         $('systemHeard').textContent = 'Listening...';
-        isRecording = true;
 
+        // Fire backup mediaRecorder to allow audio playback review
         const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
         mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
-        
-        mediaRecorder.ondataavailable = (e) => {
-            if(e.data && e.data.size > 0) audioChunks.push(e.data);
-        };
-        
-        mediaRecorder.onstop = async () => {
-            audioBlob = new Blob(audioChunks, { type: mimeType });
+        mediaRecorder.ondataavailable = (e) => { if(e.data && e.data.size > 0) audioChunks.push(e.data); };
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: mimeType });
             recordedUrl = URL.createObjectURL(audioBlob);
             reviewAudio.src = recordedUrl;
             $('playRecBtn').style.display = 'block';
-
-            $('whisperStatus').textContent = "Whisper AI is analyzing your speech locally...";
-            
-            try {
-                const audioData = await processAudioForWhisper(audioBlob);
-                const textResult = await window.runWhisperInference(audioData);
-
-                const finalPhrase = textResult ? textResult.trim() : "";
-                const heard = finalPhrase.toLowerCase();
-                
-                $('systemHeard').textContent = `System heard: "${finalPhrase || '(No speech detected)'}"`;
-                $('whisperStatus').textContent = "Analysis completed.";
-
-                // Regex punctuation clean up for bulletproof phrase matching
-                const cleanStr = str => str.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g,"").trim();
-                
-                const originalCleaned = cleanStr(playerControls[curIdx].text);
-                const heardCleaned = cleanStr(finalPhrase);
-
-                if (finalPhrase === "" || heardCleaned === "") {
-                    $('accuracyText').textContent = '0%';
-                } else {
-                    const originalWords = originalCleaned.split(/\s+/);
-                    const matchedWords = originalWords.filter(w => heardCleaned.includes(w)).length;
-                    $('accuracyText').textContent = Math.round((matchedWords / originalWords.length) * 100) + '%';
-                }
-            } catch (error) {
-                console.error("Whisper error:", error);
-                $('whisperStatus').textContent = "Error during speech computation.";
-            }
         };
         mediaRecorder.start();
+
+        // Fire pure real-time pipeline processing
+        await startRealtimeRecording(stream);
+
     } else {
         isRecording = false;
         $('startRec').classList.remove('is-recording-btn');
         $('startRec').textContent = "🎤 START RECORDING";
+        
+        // Stop hardware recording nodes
         if(mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
+        if(scriptProcessor) { scriptProcessor.disconnect(); scriptProcessor = null; }
+        if(audioCtx) { audioCtx.close(); audioCtx = null; }
+
+        $('whisperStatus').textContent = "Whisper AI is analyzing your speech locally...";
+        
+        try {
+            // Conversion of Javascript arrays directly into Float32 target format
+            const float32AudioSamples = new Float32Array(whisperAudioBuffer);
+            
+            // Send matrix directly into network pipeline
+            const textResult = await window.runWhisperInference(float32AudioSamples);
+
+            const finalPhrase = textResult ? textResult.trim() : "";
+            const heard = finalPhrase.toLowerCase();
+            
+            $('systemHeard').textContent = `System heard: "${finalPhrase || '(No speech detected)'}"`;
+            $('whisperStatus').textContent = "Analysis completed.";
+
+            const cleanStr = str => str.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g,"").trim();
+            
+            const originalCleaned = cleanStr(playerControls[curIdx].text);
+            const heardCleaned = cleanStr(finalPhrase);
+
+            if (finalPhrase === "" || heardCleaned === "") {
+                $('accuracyText').textContent = '0%';
+            } else {
+                const originalWords = originalCleaned.split(/\s+/);
+                const matchedWords = originalWords.filter(w => heardCleaned.includes(w)).length;
+                $('accuracyText').textContent = Math.round((matchedWords / originalWords.length) * 100) + '%';
+            }
+        } catch (error) {
+            console.error("Whisper error:", error);
+            $('whisperStatus').textContent = "Error during speech computation.";
+        }
     }
 };
 
@@ -528,10 +552,12 @@ function openReto(p) {
 
 function closeReto() { 
     $('modalRETO').style.display = 'none'; 
-    if(mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
     isRecording = false;
     $('startRec').classList.remove('is-recording-btn');
     $('startRec').textContent = "🎤 START RECORDING";
+    if(mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
+    if(scriptProcessor) { scriptProcessor.disconnect(); scriptProcessor = null; }
+    if(audioCtx) { audioCtx.close(); audioCtx = null; }
     reviewAudio.pause();
 }
 
