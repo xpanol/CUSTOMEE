@@ -239,11 +239,12 @@
 
     window.initWhisper = async function() {
         if (transcriber) return;
-        document.getElementById('whisperStatus').textContent = "Loading Whisper AI Model (~75MB)... Please wait.";
+        document.getElementById('whisperStatus').textContent = "Loading Multilingual Whisper AI Model (~75MB)... Please wait.";
         document.getElementById('startRec').disabled = true;
         try {
-            transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en');
-            document.getElementById('whisperStatus').textContent = "Whisper AI Engine Loaded Successfully.";
+            // Changed from 'Xenova/whisper-tiny.en' to multilingual 'Xenova/whisper-tiny'
+            transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny');
+            document.getElementById('whisperStatus').textContent = "Whisper Multilingual Engine Loaded.";
             document.getElementById('startRec').disabled = false;
         } catch (err) {
             document.getElementById('whisperStatus').textContent = "Failed to load Whisper AI. Check browser console.";
@@ -251,13 +252,13 @@
         }
     }
 
-    window.runWhisperInference = async function(audioData) {
+    window.runWhisperInference = async function(audioData, targetLanguage) {
         if (!transcriber) return "";
         try {
             const output = await transcriber(audioData, {
                 chunk_length_s: 30,
                 stride_length_s: 5,
-                language: 'english',
+                language: targetLanguage, // Dynamic: 'spanish' or 'english'
                 task: 'transcribe',
             });
             return output.text;
@@ -420,9 +421,8 @@ function draw() {
 
 // REALTIME 16KHZ AUDIO INTERCEPTOR SYSTEM
 async function startRealtimeRecording(stream) {
-    whisperAudioBuffer = []; // Reset real-time buffers
+    whisperAudioBuffer = []; 
     
-    // Create AudioContext matching system standard sampling rate
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 64;
@@ -430,7 +430,6 @@ async function startRealtimeRecording(stream) {
     source = audioCtx.createMediaStreamSource(stream);
     source.connect(analyser);
 
-    // Create secondary offline resampler targeted exactly at 16000Hz for Whisper AI stability
     const whisperContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
     const whisperSource = whisperContext.createMediaStreamSource(stream);
     
@@ -441,7 +440,6 @@ async function startRealtimeRecording(stream) {
     scriptProcessor.onaudioprocess = (event) => {
         if (!isRecording) return;
         const inputData = event.inputBuffer.getChannelData(0);
-        // Direct stream cloning into float32 arrays avoids compression artifacting
         whisperAudioBuffer.push(...inputData); 
     };
 
@@ -459,7 +457,6 @@ $('startRec').onclick = async () => {
         $('playRecBtn').style.display = 'none';
         $('systemHeard').textContent = 'Listening...';
 
-        // Fire backup mediaRecorder to allow audio playback review
         const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
         mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
         mediaRecorder.ondataavailable = (e) => { if(e.data && e.data.size > 0) audioChunks.push(e.data); };
@@ -471,7 +468,6 @@ $('startRec').onclick = async () => {
         };
         mediaRecorder.start();
 
-        // Fire pure real-time pipeline processing
         await startRealtimeRecording(stream);
 
     } else {
@@ -479,7 +475,6 @@ $('startRec').onclick = async () => {
         $('startRec').classList.remove('is-recording-btn');
         $('startRec').textContent = "🎤 START RECORDING";
         
-        // Stop hardware recording nodes
         if(mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
         if(scriptProcessor) { scriptProcessor.disconnect(); scriptProcessor = null; }
         if(audioCtx) { audioCtx.close(); audioCtx = null; }
@@ -487,11 +482,14 @@ $('startRec').onclick = async () => {
         $('whisperStatus').textContent = "Whisper AI is analyzing your speech locally...";
         
         try {
-            // Conversion of Javascript arrays directly into Float32 target format
             const float32AudioSamples = new Float32Array(whisperAudioBuffer);
             
-            // Send matrix directly into network pipeline
-            const textResult = await window.runWhisperInference(float32AudioSamples);
+            // Detect dynamic language based on active item context ('es' -> 'spanish', 'en' -> 'english')
+            const currentTrackType = playerControls[curIdx].type;
+            const targetLang = currentTrackType === 'es' ? 'spanish' : 'english';
+
+            // Run analysis passing language dynamically
+            const textResult = await window.runWhisperInference(float32AudioSamples, targetLang);
 
             const finalPhrase = textResult ? textResult.trim() : "";
             const heard = finalPhrase.toLowerCase();
