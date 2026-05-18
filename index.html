@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>BILINGUAL SELF-LEARNING APP - WEB SPEECH MODE</title>
+    <title>BILINGUAL SELF-LEARNING APP - LOCAL SPEECH MODE</title>
     <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Inter:wght@300;400;700;900&family=Montserrat:wght@300;400;700;800&family=Bebas+Neue&family=Syncopate:wght@400;700&family=Ubuntu:wght@300;400;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -111,18 +111,17 @@
         .player-done .karaoke-line { color: var(--color-done) !important; opacity: 0.8; }
         .player-done .karaoke-line span { color: inherit !important; }
 
-        #visualizerCanvas { width: 100%; max-width: 400px; height: 80px; margin: 20px 0; border-bottom: 2px solid var(--brand-border); background: rgba(255,255,255,0.05); display: none; }
-
         .modal { 
             display:none; position:fixed; inset:0; background:var(--brand-bg); 
             justify-content:center; align-items:center; flex-direction:column; z-index:5000; 
         }
         #shaText, #retoText { font-family: var(--main-font); color: var(--modal-text-color); }
         #shaTimer { font-size: 150px; font-weight: 900; color: var(--modal-text-color); }
-        #systemHeard { font-size: 14px; color: var(--brand-border); margin-top: 10px; font-style: italic; opacity: 0.8; }
-        #speechStatus { font-size: 12px; color: #888; margin-top: 5px; font-family: monospace; }
-        .is-recording-btn { background: var(--color-en) !important; animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+        #systemHeard { font-size: 14px; color: var(--brand-border); margin-top: 20px; font-style: italic; opacity: 0.8; text-align: center; max-width: 80%; }
+        #speechStatus { font-size: 12px; color: #888; margin-top: 5px; font-family: monospace; text-align: center; }
+        
+        .rec-pulse-btn { background: var(--color-en) !important; color: #000 !important; border-color: var(--color-en) !important; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -214,15 +213,16 @@
 <div id="players"></div>
 
 <div id="modalRETO" class="modal">
-    <div id="retoText" style="font-size:32px; text-align:center; max-width:850px; margin-bottom:10px; padding:0 20px;"></div>
+    <div id="retoText" style="font-size:32px; text-align:center; max-width:850px; margin-bottom:30px; padding:0 20px;"></div>
+    
     <div id="systemHeard">System heard: "..."</div>
-    <div id="speechStatus">Apple Native Speech Engine Ready</div>
-    <canvas id="visualizerCanvas"></canvas>
-    <div id="accuracyText" style="font-size:100px; font-weight:900;">0%</div>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-top:30px; width:500px; max-width:90%;">
-        <button id="startRec" class="main-btn" style="grid-column:span 2; padding:20px;">🎤 START RECORDING</button>
-        <button id="playRecBtn" class="main-btn" style="grid-column:span 2; padding:15px; display:none; border-color:#4CAF50; color:#4CAF50;">👂 PLAY MY RECORDING</button>
-        <button class="main-btn" onclick="closeReto()" style="grid-column:span 2; opacity:0.5;">BACK</button>
+    <div id="speechStatus">Native Engine Ready</div>
+    
+    <div id="accuracyText" style="font-size:100px; font-weight:900; margin: 20px 0;">0%</div>
+    
+    <div style="display:flex; flex-direction:column; gap:15px; width:400px; max-width:90%;">
+        <button id="startRec" class="main-btn" style="padding:20px; font-weight: bold;">🎤 START SPEAKING</button>
+        <button class="main-btn" onclick="closeReto()" style="opacity:0.5;">BACK</button>
     </div>
 </div>
 
@@ -239,50 +239,102 @@ const TRACK_COUNT = 30;
 let playerControls = [], curIdx = 0, isSeq = false;
 const mainAudio = new Audio();
 
-// Audio Backup Recording (for play-back review only)
-let mediaRecorder;
-let audioChunks = [];
-let recordedUrl = null;
-const reviewAudio = new Audio();
-
-// Web Speech API Configuration (iOS Native)
+// Natywny silnik rozpoznawania mowy w przeglądarce
 let recognition = null;
-let isRecording = false;
-let finalSpeechResult = "";
+let isListening = false;
 
-function initNativeSpeech() {
-    if (recognition) return;
-    
+function initSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-        $('speechStatus').textContent = "Speech recognition not supported on this device.";
-        return;
+        $('speechStatus').textContent = "Speech recognition not supported in this browser. Use Safari (iOS) or Chrome.";
+        return false;
     }
-    
     recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = false;
-    
+
     recognition.onstart = () => {
-        finalSpeechResult = "";
-        $('speechStatus').textContent = "Listening via system microphone...";
+        isListening = true;
+        $('startRec').classList.add('rec-pulse-btn');
+        $('startRec').textContent = "🛑 STOP & EVALUATE";
+        $('speechStatus').textContent = "Listening to your voice...";
     };
-    
-    recognition.onresult = (event) => {
-        if (event.results.length > 0) {
-            finalSpeechResult = event.results[0][0].transcript;
-        }
-    };
-    
+
     recognition.onerror = (e) => {
-        console.error("Speech Recognition Error", e);
-        $('speechStatus').textContent = "System microphone error: " + e.error;
+        console.error("Speech error:", e.error);
+        $('speechStatus').textContent = "Error: " + e.error;
+        stopListeningState();
     };
-    
+
     recognition.onend = () => {
-        processSpeechResult();
+        stopListeningState();
     };
+
+    recognition.onresult = (e) => {
+        const finalPhrase = e.results[0][0].transcript;
+        $('systemHeard').textContent = `System heard: "${finalPhrase}"`;
+        calculateAccuracy(finalPhrase);
+    };
+    return true;
 }
+
+function stopListeningState() {
+    isListening = false;
+    $('startRec').classList.remove('rec-pulse-btn');
+    $('startRec').textContent = "🎤 START SPEAKING";
+    if($('speechStatus').textContent === "Listening to your voice...") {
+        $('speechStatus').textContent = "Analysis complete.";
+    }
+}
+
+function calculateAccuracy(heardText) {
+    const currentTrack = playerControls[curIdx];
+    
+    const cleanStr = str => str.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g,"").replace(/\s+/g, ' ').trim();
+    
+    const originalCleaned = cleanStr(currentTrack.text);
+    const heardCleaned = cleanStr(heardText);
+
+    if (!heardCleaned) {
+        $('accuracyText').textContent = '0%';
+        return;
+    }
+
+    const originalWords = originalCleaned.split(' ');
+    const heardWords = heardCleaned.split(' ');
+    
+    let matchCount = 0;
+    
+    // Sprawdzamy obecność słów kluczowych
+    originalWords.forEach(word => {
+        if(heardWords.includes(word)) {
+            matchCount++;
+        }
+    });
+
+    const accuracyPercentage = Math.round((matchCount / originalWords.length) * 100);
+    $('accuracyText').textContent = Math.min(accuracyPercentage, 100) + '%';
+}
+
+$('startRec').onclick = () => {
+    if (!recognition) {
+        if (!initSpeechRecognition()) return;
+    }
+
+    if (!isListening) {
+        const currentTrack = playerControls[curIdx];
+        // Ustawiamy język rozpoznawania dynamicznie na podstawie typu lekcji
+        recognition.lang = currentTrack.type === 'es' ? 'es-ES' : 'en-US';
+        
+        try {
+            recognition.start();
+        } catch(e) {
+            console.error(e);
+        }
+    } else {
+        recognition.stop();
+    }
+};
 
 function resetPlayers() {
     isSeq = false;
@@ -398,76 +450,6 @@ function play(p) {
     };
 }
 
-$('startRec').onclick = async () => {
-    initNativeSpeech();
-    if (!recognition) return;
-
-    if (!isRecording) {
-        isRecording = true;
-        audioChunks = [];
-        $('startRec').classList.add('is-recording-btn');
-        $('startRec').textContent = "🛑 STOP & ANALYZE";
-        $('playRecBtn').style.display = 'none';
-        $('systemHeard').textContent = 'Listening...';
-
-        // Select correct language for native hardware engine
-        const currentTrackType = playerControls[curIdx].type;
-        recognition.lang = currentTrackType === 'es' ? 'es-ES' : 'en-US';
-        
-        // Start Native Voice Capture
-        recognition.start();
-
-        // Start Audio Recorder (Just for playback preview)
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
-            mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
-            mediaRecorder.ondataavailable = (e) => { if(e.data && e.data.size > 0) audioChunks.push(e.data); };
-            mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(audioChunks, { type: mimeType });
-                recordedUrl = URL.createObjectURL(audioBlob);
-                reviewAudio.src = recordedUrl;
-                $('playRecBtn').style.display = 'block';
-            };
-            mediaRecorder.start();
-        } catch(err) {
-            console.log("Audio backup capture unavailable or blocked.");
-        }
-
-    } else {
-        isRecording = false;
-        $('startRec').classList.remove('is-recording-btn');
-        $('startRec').textContent = "🎤 START RECORDING";
-        
-        // Stops native recognition engine and triggers automatic processing
-        if(recognition) recognition.stop();
-        if(mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
-    }
-};
-
-function processSpeechResult() {
-    if (isRecording) return; // Wait until explicitly stopped or timed-out
-    
-    $('whisperStatus').textContent = "Analysis completed.";
-    const finalPhrase = finalSpeechResult.trim();
-    $('systemHeard').textContent = `System heard: "${finalPhrase || '(No speech detected)'}"`;
-
-    const cleanStr = str => str.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g,"").trim();
-    
-    const originalCleaned = cleanStr(playerControls[curIdx].text);
-    const heardCleaned = cleanStr(finalPhrase);
-
-    if (finalPhrase === "" || heardCleaned === "") {
-        $('accuracyText').textContent = '0%';
-    } else {
-        const originalWords = originalCleaned.split(/\s+/);
-        const matchedWords = originalWords.filter(w => heardCleaned.includes(w)).length;
-        $('accuracyText').textContent = Math.round((matchedWords / originalWords.length) * 100) + '%';
-    }
-}
-
-$('playRecBtn').onclick = () => { if(recordedUrl) reviewAudio.play(); };
-
 function startShadowing(txt) {
     $('modalSHA').style.display = 'flex'; $('shaText').textContent = txt;
     let t = 5; $('shaTimer').textContent = t;
@@ -487,23 +469,17 @@ function openReto(p) {
     curIdx = playerControls.indexOf(p); 
     $('systemHeard').textContent = 'System heard: "..."';
     $('accuracyText').textContent = '0%';
-    $('playRecBtn').style.display = 'none';
-    recordedUrl = null;
-    finalSpeechResult = "";
-
     $('modalRETO').style.display = 'flex'; 
     $('retoText').textContent = p.text; 
-    $('speechStatus').textContent = "Apple Native Speech Engine Ready";
+    $('speechStatus').textContent = "Native Engine Ready";
 }
 
 function closeReto() { 
     $('modalRETO').style.display = 'none'; 
-    isRecording = false;
-    $('startRec').classList.remove('is-recording-btn');
-    $('startRec').textContent = "🎤 START RECORDING";
-    if(recognition) recognition.stop();
-    if(mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
-    reviewAudio.pause();
+    if (isListening && recognition) {
+        recognition.abort();
+    }
+    stopListeningState();
 }
 
 $('brandingToggle').onclick = () => $('brandingPanel').classList.toggle('open');
