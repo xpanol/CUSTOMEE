@@ -399,7 +399,7 @@ $('startRec').onclick = async () => {
 
 $('playRecBtn').onclick = () => {
     if (recordedUrl) {
-        mainAudio.pause(); // Zatrzymujemy oryginał przed odtworzeniem siebie
+        mainAudio.pause();
         reviewAudio.play();
     }
 };
@@ -407,7 +407,7 @@ $('playRecBtn').onclick = () => {
 $('playOrigBtn').onclick = () => {
     const currentTrack = playerControls[curIdx];
     if (currentTrack && currentTrack.audio) {
-        reviewAudio.pause(); // Zatrzymujemy nagranie użytkownika przed odtworzeniem oryginału
+        reviewAudio.pause();
         mainAudio.src = currentTrack.audio;
         mainAudio.play();
     }
@@ -561,8 +561,15 @@ function openReto(p) {
     curIdx = playerControls.indexOf(p); 
     $('systemHeard').textContent = 'System heard: "..."';
     $('accuracyText').textContent = '0%';
-    $('playRecBtn').style.display = 'none';
-    recordedUrl = null;
+    
+    // USUNIĘTO BŁĄD: Nie resetujemy i nie ukrywamy playRecBtn w tym miejscu, 
+    // aby po ponownym otwarciu panelu stan przycisku odpowiadał prawdzie.
+    if (!recordedUrl) {
+        $('playRecBtn').style.display = 'none';
+    } else {
+        $('playRecBtn').style.display = 'block';
+    }
+    
     $('modalRETO').style.display = 'flex'; 
     $('retoText').textContent = p.text; 
     $('speechStatus').textContent = "Native Engine Ready";
