@@ -382,7 +382,6 @@ $('startRec').onclick = async () => {
             mediaRecorder.onstop = () => {
                 const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
                 recordedUrl = URL.createObjectURL(audioBlob);
-                reviewAudio.src = recordedUrl;
                 $('playRecBtn').style.display = 'block';
             };
 
@@ -400,7 +399,9 @@ $('startRec').onclick = async () => {
 $('playRecBtn').onclick = () => {
     if (recordedUrl) {
         mainAudio.pause();
-        reviewAudio.play();
+        reviewAudio.src = recordedUrl; // Wymuszenie ponownego i stabilnego załadowania Bloba przed odtworzeniem
+        reviewAudio.load();
+        reviewAudio.play().catch(err => console.error("Odtwarzanie nagrania nieudane:", err));
     }
 };
 
@@ -562,8 +563,6 @@ function openReto(p) {
     $('systemHeard').textContent = 'System heard: "..."';
     $('accuracyText').textContent = '0%';
     
-    // USUNIĘTO BŁĄD: Nie resetujemy i nie ukrywamy playRecBtn w tym miejscu, 
-    // aby po ponownym otwarciu panelu stan przycisku odpowiadał prawdzie.
     if (!recordedUrl) {
         $('playRecBtn').style.display = 'none';
     } else {
