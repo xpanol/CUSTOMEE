@@ -213,7 +213,9 @@
 <div id="players"></div>
 
 <div id="modalRETO" class="modal">
-    <div id="retoText" style="font-size:32px; text-align:center; max-width:850px; margin-bottom:30px; padding:0 20px;"></div>
+    <div id="retoText" style="font-size:32px; text-align:center; max-width:850px; margin-bottom:15px; padding:0 20px;"></div>
+    
+    <button id="playOrigBtn" class="main-btn" style="padding:8px 16px; font-size:11px; margin-bottom:20px; border-color:var(--brand-border); color:var(--brand-border);">🔊 LISTEN TO ORIGINAL</button>
     
     <div id="systemHeard">System heard: "..."</div>
     <div id="speechStatus">Native Engine Ready</div>
@@ -255,7 +257,7 @@ function initSpeechRecognition() {
         $('speechStatus').textContent = "Speech recognition not supported. Use Safari or Chrome.";
         return false;
     }
-    recognition = new SpeechRecognition();
+    recognition = new Recognition || SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = false;
 
@@ -306,13 +308,12 @@ function stopListeningState() {
 function calculateAccuracy(heardText) {
     const currentTrack = playerControls[curIdx];
     
-    // ZAAWANSOWANA FUNKCJA CZYSZCZĄCA (Usuwa specyficzne znaki hiszpańskie oraz ujednolica akcenty)
     const cleanStr = str => {
         if (!str) return "";
         return str.toLowerCase()
-                  .normalize("NFD") // Rozbija znaki akcentowane na osobne litery + akcenty (np. ó -> o + ´)
-                  .replace(/[\u0300-\u036f]/g, "") // Usuwa same fizyczne znaki akcentów (zostaje czysta litera)
-                  .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'¿¡]/g, "") // Usunięto hiszpańskie ¿ oraz ¡
+                  .normalize("NFD")
+                  .replace(/[\u0300-\u036f]/g, "")
+                  .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'¿¡]/g, "")
                   .replace(/\s+/g, ' ')
                   .trim();
     };
@@ -402,11 +403,23 @@ $('playRecBtn').onclick = () => {
     }
 };
 
+// Funkcja odtwarzania oryginalnej ścieżki dźwiękowej lektora w panelu RETO
+$('playOrigBtn').onclick = () => {
+    const currentTrack = playerControls[curIdx];
+    if (currentTrack && currentTrack.audio) {
+        // Zatrzymujemy ewentualne odtwarzanie nagrania użytkownika na czas słuchania oryginału
+        reviewAudio.pause();
+        mainAudio.src = currentTrack.audio;
+        mainAudio.play();
+    }
+};
+
 $('resetRetoBtn').onclick = () => {
     if (isListening && recognition) {
         recognition.abort();
     }
     reviewAudio.pause();
+    mainAudio.pause();
     stopListeningState();
     
     $('systemHeard').textContent = 'System heard: "..."';
@@ -562,6 +575,7 @@ function closeReto() {
         recognition.abort();
     }
     reviewAudio.pause();
+    mainAudio.pause();
     stopListeningState();
 }
 
