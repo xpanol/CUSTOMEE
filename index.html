@@ -114,6 +114,7 @@
         .modal { 
             display:none; position:fixed; inset:0; background:var(--brand-bg); 
             justify-content:center; align-items:center; flex-direction:column; z-index:5000; 
+            overflow-y: auto; padding: 40px 0;
         }
         #shaText, #retoText { font-family: var(--main-font); color: var(--modal-text-color); }
         #shaTimer { font-size: 150px; font-weight: 900; color: var(--modal-text-color); margin: 10px 0; }
@@ -122,6 +123,14 @@
         
         .rec-pulse-btn { background: var(--color-en) !important; color: #000 !important; border-color: var(--color-en) !important; animation: pulse 1s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+
+        /* Report Styles */
+        .report-grid { display: flex; gap: 20px; margin: 20px 0; width: 80%; max-width: 850px; justify-content: center; }
+        .report-card { background: #111; border: 1px solid #333; border-radius: 8px; padding: 20px; text-align: center; flex: 1; }
+        .report-table { width: 80%; max-width: 850px; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+        .report-table th, .report-table td { border: 1px solid #333; padding: 12px; text-align: left; }
+        .report-table th { background: #161616; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; color: var(--brand-border); }
+        .report-table tr:nth-child(even) { background: #080808; }
     </style>
 </head>
 <body>
@@ -206,6 +215,7 @@
         <button onclick="startSequence('es')" class="main-btn">SPANISH</button>
         <button onclick="startSequence('en')" class="main-btn">ENGLISH</button>
         <button onclick="resetPlayers()" class="main-btn">↻ REFRESH</button>
+        <button id="viewReportBtn" onclick="openReport()" class="main-btn" style="border-color:#4CAF50; color:#4CAF50;">📋 VIEW REPORT</button>
         <button id="stopBtn" class="main-btn" style="color:var(--color-en); border-color:var(--color-en);">🛑 STOP</button>
     </div>
 </div>
@@ -241,6 +251,48 @@
     </div>
 </div>
 
+<div id="modalREPORT" class="modal">
+    <div style="font-family:var(--head-font); font-size:24px; color:var(--brand-border); margin-bottom:10px; text-transform:uppercase; letter-spacing:3px;">SESSION PERFORMANCE REPORT</div>
+    <div style="font-size:12px; color:#666; margin-bottom:20px; font-family:monospace;">Generated locally by Native Intelligence System</div>
+    
+    <div class="report-grid">
+        <div class="report-card">
+            <div style="font-size:11px; color:#888; text-transform:uppercase;">Global Accuracy</div>
+            <div id="repGlobalAcc" style="font-size:48px; font-weight:900; color:#4CAF50; margin-top:5px;">0%</div>
+        </div>
+        <div class="report-card">
+            <div style="font-size:11px; color:#888; text-transform:uppercase;">Total Reto Runs</div>
+            <div id="repTotalRuns" style="font-size:48px; font-weight:900; margin-top:5px;">0</div>
+        </div>
+        <div class="report-card">
+            <div style="font-size:11px; color:#888; text-transform:uppercase;">Breakdown</div>
+            <div id="repBreakdown" style="font-size:12px; text-align:left; margin-top:8px; line-height:1.4; font-family:monospace;">
+                🟢 Good (>=80%): 0<br>
+                🟡 Mid (50-79%): 0<br>
+                🔴 Low (<50%): 0
+            </div>
+        </div>
+    </div>
+    
+    <table class="report-table">
+        <thead>
+            <tr>
+                <th style="width:8%;">ID</th>
+                <th style="width:10%;">Lang</th>
+                <th style="width:12%;">Score</th>
+                <th>Visual Comparison Analytics Log</th>
+            </tr>
+        </thead>
+        <tbody id="reportTableBody">
+            <tr>
+                <td colspan="4" style="text-align:center; color:#555; padding:30px;">No data recorded in this learning session yet. Run a PRO RETO challenge first.</td>
+            </tr>
+        </tbody>
+    </table>
+    
+    <button class="main-btn" onclick="$('modalREPORT').style.display='none'" style="margin-top:30px; width:200px; padding:12px;">CLOSE REPORT</button>
+</div>
+
 <script>
 const $ = id => document.getElementById(id);
 const BASE_URL = 'https://raw.githubusercontent.com/xpanol/PLAYERS/main/';
@@ -256,6 +308,11 @@ let recordedUrl = null;
 let reviewAudio = null;
 let globalStream = null;
 let shaInterval = null;
+
+// Report Engine Session State Holder
+let sessionHistoryLog = []; 
+let lastEvaluatedScore = 0;
+let lastEvaluatedHtml = "";
 
 function getSupportedMimeType() {
     const types = [
@@ -298,7 +355,6 @@ function initSpeechRecognition() {
     };
 
     recognition.onend = () => {
-        // Pozwól procesom zakończyć się naturalnie, bez wymuszania stopu rejestratora
         if (isListening) {
             stopListeningState();
         }
@@ -316,7 +372,6 @@ function stopListeningState() {
     $('startRec').classList.remove('rec-pulse-btn');
     $('startRec').textContent = "🎤 START SPEAKING";
     
-    // Najpierw bezpiecznie zatrzymaj zapis fizyczny audio z mikrofonu
     if (mediaRecorder && mediaRecorder.state === "recording") {
         mediaRecorder.stop();
     }
@@ -349,14 +404,15 @@ function calculateAccuracy(heardText) {
     const s1 = cleanStr(currentTrack.text);
     const s2 = cleanStr(heardText);
 
-    // GWARANCJA renderowania wizualnego porównania nawet przy braku sygnału (0%)
     if (!s1 || !s2) {
+        lastEvaluatedScore = 0;
         $('accuracyText').textContent = '0%';
         let fallbackOutput = "";
         currentTrack.text.split(/\s+/).forEach(word => {
             fallbackOutput += `<span style="color:#f03246; text-decoration:line-through; opacity:0.7;">${word}</span> `;
         });
-        $('systemHeard').innerHTML = `<strong>Visual Comparison:</strong><br>${fallbackOutput.trim()}`;
+        lastEvaluatedHtml = fallbackOutput.trim();
+        $('systemHeard').innerHTML = `<strong>Visual Comparison:</strong><br>${lastEvaluatedHtml}`;
         return;
     }
 
@@ -385,9 +441,10 @@ function calculateAccuracy(heardText) {
     const maxLength = Math.max(s1.length, s2.length);
     let accuracyPercentage = Math.round(((maxLength - distance) / maxLength) * 100);
     if (accuracyPercentage >= 92) accuracyPercentage = 100;
-    $('accuracyText').textContent = Math.max(0, Math.min(accuracyPercentage, 100)) + '%';
+    
+    lastEvaluatedScore = Math.max(0, Math.min(accuracyPercentage, 100));
+    $('accuracyText').textContent = lastEvaluatedScore + '%';
 
-    // Generowanie stabilnego podświetlania tekstu (Słowo po słowie)
     const originalWords = currentTrack.text.split(/\s+/);
     const heardWordsClean = s2.split(/\s+/);
     
@@ -401,7 +458,8 @@ function calculateAccuracy(heardText) {
         }
     });
     
-    $('systemHeard').innerHTML = `<strong>Visual Comparison:</strong><br>${htmlOutput.trim()}`;
+    lastEvaluatedHtml = htmlOutput.trim();
+    $('systemHeard').innerHTML = `<strong>Visual Comparison:</strong><br>${lastEvaluatedHtml}`;
 }
 
 $('startRec').onclick = async () => {
@@ -431,7 +489,7 @@ $('startRec').onclick = async () => {
                 const finalMime = mimeType || mediaRecorder.mimeType || 'audio/wav';
                 const audioBlob = new Blob(audioChunks, { type: finalMime });
                 recordedUrl = URL.createObjectURL(audioBlob);
-                $('playRecBtn').style.display = 'block'; // Pokazuje przycisk natychmiast po udanym zapisie blob
+                $('playRecBtn').style.display = 'block';
             };
 
             mediaRecorder.start();
@@ -475,6 +533,8 @@ $('resetRetoBtn').onclick = () => {
     $('playRecBtn').style.display = 'none';
     recordedUrl = null;
     reviewAudio = null;
+    lastEvaluatedScore = 0;
+    lastEvaluatedHtml = "";
     $('speechStatus').textContent = "Native Engine Ready (Reset Done)";
 };
 
@@ -482,6 +542,7 @@ function resetPlayers() {
     isSeq = false;
     mainAudio.pause();
     mainAudio.currentTime = 0;
+    sessionHistoryLog = []; // Reset logs on global reload
     if(shaInterval) clearInterval(shaInterval);
     playerControls.forEach(p => {
         p.div.classList.remove('player-done');
@@ -642,13 +703,71 @@ function openReto(p) {
     $('speechStatus').textContent = "Native Engine Ready";
     recordedUrl = null;
     reviewAudio = null;
+    lastEvaluatedScore = 0;
+    lastEvaluatedHtml = "";
 }
 
 function closeReto() { 
+    // Gwarancja zapisu stanu do raportu przed zamknięciem, jeśli użytkownik podjął próbę
+    if(lastEvaluatedHtml !== "") {
+        const currentTrack = playerControls[curIdx];
+        sessionHistoryLog.push({
+            id: Math.floor(curIdx / 2) + 1,
+            lang: currentTrack.type.toUpperCase(),
+            score: lastEvaluatedScore,
+            html: lastEvaluatedHtml
+        });
+    }
+
     $('modalRETO').style.display = 'none'; 
     stopListeningState();
     if (reviewAudio) reviewAudio.pause();
     mainAudio.pause();
+}
+
+// Logic to parse and render data inside report dashboard modal
+function openReport() {
+    mainAudio.pause();
+    if (reviewAudio) reviewAudio.pause();
+    
+    const runsCount = sessionHistoryLog.length;
+    $('repTotalRuns').textContent = runsCount;
+
+    if(runsCount === 0) {
+        $('repGlobalAcc').textContent = '0%';
+        $('repGlobalAcc').style.color = '#555';
+        $('repBreakdown').innerHTML = `🟢 Good (>=80%): 0<br>🟡 Mid (50-79%): 0<br>🔴 Low (<50%): 0`;
+        $('reportTableBody').innerHTML = `<tr><td colspan="4" style="text-align:center; color:#555; padding:30px;">No data recorded in this learning session yet. Run a PRO RETO challenge first.</td></tr>`;
+    } else {
+        let totalScoreSum = 0;
+        let good = 0, mid = 0, low = 0;
+        let rowsHtml = "";
+
+        sessionHistoryLog.forEach(item => {
+            totalScoreSum += item.score;
+            if(item.score >= 80) { good++; }
+            else if(item.score >= 50) { mid++; }
+            else { low++; }
+
+            let scoreColor = item.score >= 80 ? '#4CAF50' : (item.score >= 50 ? '#F8AC10' : '#f03246');
+            
+            rowsHtml += `<tr>
+                <td><strong>#${item.id}</strong></td>
+                <td><span style="color:${item.lang==='ES'?'var(--color-es)':'var(--color-en)'}">${item.lang}</span></td>
+                <td><span style="color:${scoreColor}; font-weight:bold;">${item.score}%</span></td>
+                <td><div style="line-height:1.4;">${item.html}</div></td>
+            </tr>`;
+        });
+
+        const globalAvg = Math.round(totalScoreSum / runsCount);
+        $('repGlobalAcc').textContent = globalAvg + '%';
+        $('repGlobalAcc').style.color = globalAvg >= 80 ? '#4CAF50' : (globalAvg >= 50 ? '#F8AC10' : '#f03246');
+
+        $('repBreakdown').innerHTML = `🟢 Good (>=80%): ${good}<br>🟡 Mid (50-79%): ${mid}<br>🔴 Low (<50%): ${low}`;
+        $('reportTableBody').innerHTML = rowsHtml;
+    }
+
+    $('modalREPORT').style.display = 'flex';
 }
 
 $('brandingToggle').onclick = () => $('brandingPanel').classList.toggle('open');
