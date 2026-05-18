@@ -117,7 +117,7 @@
         }
         #shaText, #retoText { font-family: var(--main-font); color: var(--modal-text-color); }
         #shaTimer { font-size: 150px; font-weight: 900; color: var(--modal-text-color); margin: 10px 0; }
-        #systemHeard { font-size: 16px; color: var(--brand-text); margin-top: 20px; text-align: center; max-width: 80%; line-height: 1.5; }
+        #systemHeard { font-size: 18px; color: var(--brand-text); margin-top: 20px; text-align: center; max-width: 80%; line-height: 1.6; letter-spacing: 1px; }
         #speechStatus { font-size: 12px; color: #888; margin-top: 5px; font-family: monospace; text-align: center; }
         
         .rec-pulse-btn { background: var(--color-en) !important; color: #000 !important; border-color: var(--color-en) !important; animation: pulse 1s infinite; }
@@ -298,7 +298,10 @@ function initSpeechRecognition() {
     };
 
     recognition.onend = () => {
-        stopListeningState();
+        // Pozwól procesom zakończyć się naturalnie, bez wymuszania stopu rejestratora
+        if (isListening) {
+            stopListeningState();
+        }
     };
 
     recognition.onresult = (e) => {
@@ -313,12 +316,16 @@ function stopListeningState() {
     $('startRec').classList.remove('rec-pulse-btn');
     $('startRec').textContent = "🎤 START SPEAKING";
     
+    // Najpierw bezpiecznie zatrzymaj zapis fizyczny audio z mikrofonu
     if (mediaRecorder && mediaRecorder.state === "recording") {
         mediaRecorder.stop();
     }
     if (globalStream) {
         globalStream.getTracks().forEach(track => track.stop());
         globalStream = null;
+    }
+    if (recognition) {
+        try { recognition.stop(); } catch(e) {}
     }
 
     if($('speechStatus').textContent === "Listening to your voice...") {
@@ -342,9 +349,14 @@ function calculateAccuracy(heardText) {
     const s1 = cleanStr(currentTrack.text);
     const s2 = cleanStr(heardText);
 
+    // GWARANCJA renderowania wizualnego porównania nawet przy braku sygnału (0%)
     if (!s1 || !s2) {
         $('accuracyText').textContent = '0%';
-        $('systemHeard').innerHTML = `<span style="color:#f03246; text-decoration:line-through;">${currentTrack.text}</span>`;
+        let fallbackOutput = "";
+        currentTrack.text.split(/\s+/).forEach(word => {
+            fallbackOutput += `<span style="color:#f03246; text-decoration:line-through; opacity:0.7;">${word}</span> `;
+        });
+        $('systemHeard').innerHTML = `<strong>Visual Comparison:</strong><br>${fallbackOutput.trim()}`;
         return;
     }
 
@@ -375,7 +387,7 @@ function calculateAccuracy(heardText) {
     if (accuracyPercentage >= 92) accuracyPercentage = 100;
     $('accuracyText').textContent = Math.max(0, Math.min(accuracyPercentage, 100)) + '%';
 
-    // Word-by-word comparison highlight
+    // Generowanie stabilnego podświetlania tekstu (Słowo po słowie)
     const originalWords = currentTrack.text.split(/\s+/);
     const heardWordsClean = s2.split(/\s+/);
     
@@ -389,7 +401,7 @@ function calculateAccuracy(heardText) {
         }
     });
     
-    $('systemHeard').innerHTML = `<strong>Comparison:</strong><br>${htmlOutput.trim()}`;
+    $('systemHeard').innerHTML = `<strong>Visual Comparison:</strong><br>${htmlOutput.trim()}`;
 }
 
 $('startRec').onclick = async () => {
@@ -419,7 +431,7 @@ $('startRec').onclick = async () => {
                 const finalMime = mimeType || mediaRecorder.mimeType || 'audio/wav';
                 const audioBlob = new Blob(audioChunks, { type: finalMime });
                 recordedUrl = URL.createObjectURL(audioBlob);
-                $('playRecBtn').style.display = 'block';
+                $('playRecBtn').style.display = 'block'; // Pokazuje przycisk natychmiast po udanym zapisie blob
             };
 
             mediaRecorder.start();
@@ -429,7 +441,7 @@ $('startRec').onclick = async () => {
             try { recognition.start(); } catch(err) {}
         }
     } else {
-        recognition.stop();
+        stopListeningState();
     }
 };
 
@@ -454,9 +466,6 @@ $('playOrigBtn').onclick = () => {
 };
 
 $('resetRetoBtn').onclick = () => {
-    if (isListening && recognition) {
-        recognition.abort();
-    }
     if (reviewAudio) reviewAudio.pause();
     mainAudio.pause();
     stopListeningState();
@@ -626,26 +635,20 @@ function openReto(p) {
     curIdx = playerControls.indexOf(p); 
     $('systemHeard').textContent = 'Visual comparison will appear here after recording...';
     $('accuracyText').textContent = '0%';
-    
-    if (!recordedUrl) {
-        $('playRecBtn').style.display = 'none';
-    } else {
-        $('playRecBtn').style.display = 'block';
-    }
+    $('playRecBtn').style.display = 'none';
     
     $('modalRETO').style.display = 'flex'; 
     $('retoText').textContent = p.text; 
     $('speechStatus').textContent = "Native Engine Ready";
+    recordedUrl = null;
+    reviewAudio = null;
 }
 
 function closeReto() { 
     $('modalRETO').style.display = 'none'; 
-    if (isListening && recognition) {
-        recognition.abort();
-    }
+    stopListeningState();
     if (reviewAudio) reviewAudio.pause();
     mainAudio.pause();
-    stopListeningState();
 }
 
 $('brandingToggle').onclick = () => $('brandingPanel').classList.toggle('open');
