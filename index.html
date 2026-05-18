@@ -252,12 +252,12 @@ const reviewAudio = new Audio();
 let globalStream = null;
 
 function initSpeechRecognition() {
-    const SpeechRecognition = window.ShareSpeechRecognition || window.webkitSpeechRecognition || window.SpeechRecognition;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
         $('speechStatus').textContent = "Speech recognition not supported. Use Safari or Chrome.";
         return false;
     }
-    recognition = new Recognition || SpeechRecognition();
+    recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = false;
 
@@ -403,11 +403,9 @@ $('playRecBtn').onclick = () => {
     }
 };
 
-// Funkcja odtwarzania oryginalnej ścieżki dźwiękowej lektora w panelu RETO
 $('playOrigBtn').onclick = () => {
     const currentTrack = playerControls[curIdx];
     if (currentTrack && currentTrack.audio) {
-        // Zatrzymujemy ewentualne odtwarzanie nagrania użytkownika na czas słuchania oryginału
         reviewAudio.pause();
         mainAudio.src = currentTrack.audio;
         mainAudio.play();
