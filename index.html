@@ -222,6 +222,7 @@
     
     <div style="display:flex; flex-direction:column; gap:15px; width:400px; max-width:90%;">
         <button id="startRec" class="main-btn" style="padding:20px; font-weight: bold;">🎤 START SPEAKING</button>
+        <button id="playRecBtn" class="main-btn" style="padding:15px; display:none; border-color:#4CAF50; color:#4CAF50;">👂 PLAY MY RECORDING</button>
         <button class="main-btn" onclick="closeReto()" style="opacity:0.5;">BACK</button>
     </div>
 </div>
@@ -239,14 +240,19 @@ const TRACK_COUNT = 30;
 let playerControls = [], curIdx = 0, isSeq = false;
 const mainAudio = new Audio();
 
-// Natywny silnik rozpoznawania mowy w przeglądarce
+// Parametry natywnego rozpoznawania i równoległego zapisu audio
 let recognition = null;
 let isListening = false;
+let mediaRecorder = null;
+let audioChunks = [];
+let recordedUrl = null;
+const reviewAudio = new Audio();
+let globalStream = null;
 
 function initSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-        $('speechStatus').textContent = "Speech recognition not supported in this browser. Use Safari (iOS) or Chrome.";
+        $('speechStatus').textContent = "Speech recognition not supported. Use Safari or Chrome.";
         return false;
     }
     recognition = new SpeechRecognition();
@@ -258,6 +264,7 @@ function initSpeechRecognition() {
         $('startRec').classList.add('rec-pulse-btn');
         $('startRec').textContent = "🛑 STOP & EVALUATE";
         $('speechStatus').textContent = "Listening to your voice...";
+        $('playRecBtn').style.display = 'none'; // ukryj odsłuch podczas nowego nagrywania
     };
 
     recognition.onerror = (e) => {
@@ -282,6 +289,16 @@ function stopListeningState() {
     isListening = false;
     $('startRec').classList.remove('rec-pulse-btn');
     $('startRec').textContent = "🎤 START SPEAKING";
+    
+    // Zatrzymanie fizycznego rejestratora audio, jeśli nagrywa
+    if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+    }
+    if (globalStream) {
+        globalStream.getTracks().forEach(track => track.stop());
+        globalStream = null;
+    }
+
     if($('speechStatus').textContent === "Listening to your voice...") {
         $('speechStatus').textContent = "Analysis complete.";
     }
@@ -289,7 +306,6 @@ function stopListeningState() {
 
 function calculateAccuracy(heardText) {
     const currentTrack = playerControls[curIdx];
-    
     const cleanStr = str => str.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g,"").replace(/\s+/g, ' ').trim();
     
     const originalCleaned = cleanStr(currentTrack.text);
@@ -304,8 +320,6 @@ function calculateAccuracy(heardText) {
     const heardWords = heardCleaned.split(' ');
     
     let matchCount = 0;
-    
-    // Sprawdzamy obecność słów kluczowych
     originalWords.forEach(word => {
         if(heardWords.includes(word)) {
             matchCount++;
@@ -316,23 +330,50 @@ function calculateAccuracy(heardText) {
     $('accuracyText').textContent = Math.min(accuracyPercentage, 100) + '%';
 }
 
-$('startRec').onclick = () => {
+$('startRec').onclick = async () => {
     if (!recognition) {
         if (!initSpeechRecognition()) return;
     }
 
     if (!isListening) {
         const currentTrack = playerControls[curIdx];
-        // Ustawiamy język rozpoznawania dynamicznie na podstawie typu lekcji
         recognition.lang = currentTrack.type === 'es' ? 'es-ES' : 'en-US';
         
+        audioChunks = [];
+        recordedUrl = null;
+
         try {
+            // Równoległe uruchomienie przechwytywania strumienia mikrofonu do odsłuchu
+            globalStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(globalStream);
+            
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) audioChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                recordedUrl = URL.createObjectURL(audioBlob);
+                reviewAudio.src = recordedUrl;
+                $('playRecBtn').style.display = 'block'; // Pokaż przycisk odsłuchu po nagraniu
+            };
+
+            mediaRecorder.start();
             recognition.start();
         } catch(e) {
-            console.error(e);
+            console.error("Mic record failed:", e);
+            // Awaryjnie spróbuj odpalić samo rozpoznawanie jeśli recorder zgłosi błąd
+            try { recognition.start(); } catch(err) {}
         }
     } else {
         recognition.stop();
+    }
+};
+
+// Akcja dla przycisku odtwarzania własnego głosu
+$('playRecBtn').onclick = () => {
+    if (recordedUrl) {
+        reviewAudio.play();
     }
 };
 
@@ -469,6 +510,8 @@ function openReto(p) {
     curIdx = playerControls.indexOf(p); 
     $('systemHeard').textContent = 'System heard: "..."';
     $('accuracyText').textContent = '0%';
+    $('playRecBtn').style.display = 'none';
+    recordedUrl = null;
     $('modalRETO').style.display = 'flex'; 
     $('retoText').textContent = p.text; 
     $('speechStatus').textContent = "Native Engine Ready";
@@ -479,6 +522,7 @@ function closeReto() {
     if (isListening && recognition) {
         recognition.abort();
     }
+    reviewAudio.pause();
     stopListeningState();
 }
 
