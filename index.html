@@ -248,8 +248,24 @@ let isListening = false;
 let mediaRecorder = null;
 let audioChunks = [];
 let recordedUrl = null;
-const reviewAudio = new Audio();
+let reviewAudio = null; // Zmieniono na dynamiczną inicjalizację
 let globalStream = null;
+
+function getSupportedMimeType() {
+    const types = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/mp4',
+        'audio/aac'
+    ];
+    for (const type of types) {
+        if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(type)) {
+            return type;
+        }
+    }
+    return ''; // Domyślny dla przeglądarki, jeśli nic nie pasuje
+}
 
 function initSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -373,14 +389,19 @@ $('startRec').onclick = async () => {
 
         try {
             globalStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(globalStream);
+            
+            const mimeType = getSupportedMimeType();
+            const options = mimeType ? { mimeType } : {};
+            
+            mediaRecorder = new MediaRecorder(globalStream, options);
             
             mediaRecorder.ondataavailable = (e) => {
                 if (e.data && e.data.size > 0) audioChunks.push(e.data);
             };
 
             mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                const finalMime = mimeType || mediaRecorder.mimeType || 'audio/wav';
+                const audioBlob = new Blob(audioChunks, { type: finalMime });
                 recordedUrl = URL.createObjectURL(audioBlob);
                 $('playRecBtn').style.display = 'block';
             };
@@ -399,16 +420,20 @@ $('startRec').onclick = async () => {
 $('playRecBtn').onclick = () => {
     if (recordedUrl) {
         mainAudio.pause();
-        reviewAudio.src = recordedUrl; // Wymuszenie ponownego i stabilnego załadowania Bloba przed odtworzeniem
-        reviewAudio.load();
-        reviewAudio.play().catch(err => console.error("Odtwarzanie nagrania nieudane:", err));
+        
+        // Dynamiczna re-inicjalizacja odtwarzacza, rozwiązująca błędy blokowania strumienia w przeglądarkach
+        if (reviewAudio) {
+            reviewAudio.pause();
+        }
+        reviewAudio = new Audio(recordedUrl);
+        reviewAudio.play().catch(err => console.error("Playback failed:", err));
     }
 };
 
 $('playOrigBtn').onclick = () => {
     const currentTrack = playerControls[curIdx];
     if (currentTrack && currentTrack.audio) {
-        reviewAudio.pause();
+        if (reviewAudio) reviewAudio.pause();
         mainAudio.src = currentTrack.audio;
         mainAudio.play();
     }
@@ -418,7 +443,7 @@ $('resetRetoBtn').onclick = () => {
     if (isListening && recognition) {
         recognition.abort();
     }
-    reviewAudio.pause();
+    if (reviewAudio) reviewAudio.pause();
     mainAudio.pause();
     stopListeningState();
     
@@ -426,6 +451,7 @@ $('resetRetoBtn').onclick = () => {
     $('accuracyText').textContent = '0%';
     $('playRecBtn').style.display = 'none';
     recordedUrl = null;
+    reviewAudio = null;
     $('speechStatus').textContent = "Native Engine Ready (Reset Done)";
 };
 
@@ -579,7 +605,7 @@ function closeReto() {
     if (isListening && recognition) {
         recognition.abort();
     }
-    reviewAudio.pause();
+    if (reviewAudio) reviewAudio.pause();
     mainAudio.pause();
     stopListeningState();
 }
