@@ -222,6 +222,7 @@
     
     <div style="display:flex; flex-direction:column; gap:15px; width:400px; max-width:90%;">
         <button id="startRec" class="main-btn" style="padding:20px; font-weight: bold;">🎤 START SPEAKING</button>
+        <button id="resetRetoBtn" class="main-btn" style="padding:12px; font-size:11px; opacity:0.8;">↻ RESET RETO</button>
         <button id="playRecBtn" class="main-btn" style="padding:15px; display:none; border-color:#4CAF50; color:#4CAF50;">👂 PLAY MY RECORDING</button>
         <button class="main-btn" onclick="closeReto()" style="opacity:0.5;">BACK</button>
     </div>
@@ -249,7 +250,7 @@ const reviewAudio = new Audio();
 let globalStream = null;
 
 function initSpeechRecognition() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognition = window.ShareSpeechRecognition || window.webkitSpeechRecognition || window.SpeechRecognition;
     if (!SpeechRecognition) {
         $('speechStatus').textContent = "Speech recognition not supported. Use Safari or Chrome.";
         return false;
@@ -302,36 +303,59 @@ function stopListeningState() {
     }
 }
 
-// POPRAWIONA LOGIKA OCENIANIA (Zabezpieczona przed pustymi spacjami i interpunkcją)
 function calculateAccuracy(heardText) {
     const currentTrack = playerControls[curIdx];
     
-    // Ulepszona funkcja czyszcząca - usuwa znaki, trimuje końce i redukuje wielokrotne spacje w jedną
-    const cleanStr = str => str.toLowerCase()
-                               .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g,"")
-                               .replace(/\s+/g, ' ')
-                               .trim();
+    // ZAAWANSOWANA FUNKCJA CZYSZCZĄCA (Usuwa specyficzne znaki hiszpańskie oraz ujednolica akcenty)
+    const cleanStr = str => {
+        if (!str) return "";
+        return str.toLowerCase()
+                  .normalize("NFD") // Rozbija znaki akcentowane na osobne litery + akcenty (np. ó -> o + ´)
+                  .replace(/[\u0300-\u036f]/g, "") // Usuwa same fizyczne znaki akcentów (zostaje czysta litera)
+                  .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'¿¡]/g, "") // Usunięto hiszpańskie ¿ oraz ¡
+                  .replace(/\s+/g, ' ')
+                  .trim();
+    };
     
-    const originalCleaned = cleanStr(currentTrack.text);
-    const heardCleaned = cleanStr(heardText);
+    const s1 = cleanStr(currentTrack.text);
+    const s2 = cleanStr(heardText);
 
-    if (!heardCleaned || !originalCleaned) {
+    if (!s1 || !s2) {
         $('accuracyText').textContent = '0%';
         return;
     }
 
-    const originalWords = originalCleaned.split(' ').filter(word => word.length > 0);
-    const heardWords = heardCleaned.split(' ').filter(word => word.length > 0);
-    
-    let matchCount = 0;
-    originalWords.forEach(word => {
-        if(heardWords.includes(word)) {
-            matchCount++;
+    const getLevenshteinDistance = (a, b) => {
+        const matrix = [];
+        for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+        for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+        
+        for (let i = 1; i <= b.length; i++) {
+            for (let j = 1; j <= a.length; j++) {
+                if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                    matrix[i][j] = matrix[i - 1][j - 1];
+                } else {
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j - 1] + 1,
+                        matrix[i][j - 1] + 1,
+                        matrix[i - 1][j] + 1
+                    );
+                }
+            }
         }
-    });
+        return matrix[b.length][a.length];
+    };
 
-    const accuracyPercentage = Math.round((matchCount / originalWords.length) * 100);
-    $('accuracyText').textContent = Math.min(accuracyPercentage, 100) + '%';
+    const distance = getLevenshteinDistance(s1, s2);
+    const maxLength = Math.max(s1.length, s2.length);
+    
+    let accuracyPercentage = Math.round(((maxLength - distance) / maxLength) * 100);
+    
+    if (accuracyPercentage >= 92) {
+        accuracyPercentage = 100;
+    }
+
+    $('accuracyText').textContent = Math.max(0, Math.min(accuracyPercentage, 100)) + '%';
 }
 
 $('startRec').onclick = async () => {
@@ -376,6 +400,20 @@ $('playRecBtn').onclick = () => {
     if (recordedUrl) {
         reviewAudio.play();
     }
+};
+
+$('resetRetoBtn').onclick = () => {
+    if (isListening && recognition) {
+        recognition.abort();
+    }
+    reviewAudio.pause();
+    stopListeningState();
+    
+    $('systemHeard').textContent = 'System heard: "..."';
+    $('accuracyText').textContent = '0%';
+    $('playRecBtn').style.display = 'none';
+    recordedUrl = null;
+    $('speechStatus').textContent = "Native Engine Ready (Reset Done)";
 };
 
 function resetPlayers() {
