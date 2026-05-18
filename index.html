@@ -399,6 +399,7 @@ $('startRec').onclick = async () => {
 
 $('playRecBtn').onclick = () => {
     if (recordedUrl) {
+        mainAudio.pause(); // Zatrzymujemy oryginał przed odtworzeniem siebie
         reviewAudio.play();
     }
 };
@@ -406,7 +407,7 @@ $('playRecBtn').onclick = () => {
 $('playOrigBtn').onclick = () => {
     const currentTrack = playerControls[curIdx];
     if (currentTrack && currentTrack.audio) {
-        reviewAudio.pause();
+        reviewAudio.pause(); // Zatrzymujemy nagranie użytkownika przed odtworzeniem oryginału
         mainAudio.src = currentTrack.audio;
         mainAudio.play();
     }
