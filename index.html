@@ -116,7 +116,7 @@
             justify-content:center; align-items:center; flex-direction:column; z-index:5000; 
         }
         #shaText, #retoText { font-family: var(--main-font); color: var(--modal-text-color); }
-        #shaTimer { font-size: 150px; font-weight: 900; color: var(--modal-text-color); }
+        #shaTimer { font-size: 150px; font-weight: 900; color: var(--modal-text-color); margin: 10px 0; }
         #systemHeard { font-size: 14px; color: var(--brand-border); margin-top: 20px; font-style: italic; opacity: 0.8; text-align: center; max-width: 80%; }
         #speechStatus { font-size: 12px; color: #888; margin-top: 5px; font-family: monospace; text-align: center; }
         
@@ -232,8 +232,13 @@
 
 <div id="modalSHA" class="modal">
     <div style="font-family:var(--head-font); font-size:16px; color:var(--brand-border); margin-bottom:30px; border:2px solid var(--brand-border); padding:15px 45px; border-radius:50px;">SHADOWING PAUSE</div>
-    <div id="shaText" style="font-size:36px; text-align:center; max-width:850px; margin-bottom:60px; font-weight:bold; padding:0 20px;"></div>
+    <div id="shaText" style="font-size:36px; text-align:center; max-width:850px; margin-bottom:40px; font-weight:bold; padding:0 20px;"></div>
     <div id="shaTimer">5</div>
+    
+    <div style="display:flex; gap:15px; width:400px; max-width:90%; margin-top:20px;">
+        <button id="skipShaBtn" class="main-btn" style="flex:1; padding:15px; font-size:12px;">⏭ SKIP PAUSE</button>
+        <button id="nextShaBtn" class="main-btn" style="flex:1; padding:15px; font-size:12px; border-color:var(--brand-border); color:var(--brand-border);">▶ NEXT TRACK</button>
+    </div>
 </div>
 
 <script>
@@ -248,8 +253,9 @@ let isListening = false;
 let mediaRecorder = null;
 let audioChunks = [];
 let recordedUrl = null;
-let reviewAudio = null; // Zmieniono na dynamiczną inicjalizację
+let reviewAudio = null;
 let globalStream = null;
+let shaInterval = null; // Przeniesienie timera do zmiennej globalnej skryptu
 
 function getSupportedMimeType() {
     const types = [
@@ -264,7 +270,7 @@ function getSupportedMimeType() {
             return type;
         }
     }
-    return ''; // Domyślny dla przeglądarki, jeśli nic nie pasuje
+    return '';
 }
 
 function initSpeechRecognition() {
@@ -420,8 +426,6 @@ $('startRec').onclick = async () => {
 $('playRecBtn').onclick = () => {
     if (recordedUrl) {
         mainAudio.pause();
-        
-        // Dynamiczna re-inicjalizacja odtwarzacza, rozwiązująca błędy blokowania strumienia w przeglądarkach
         if (reviewAudio) {
             reviewAudio.pause();
         }
@@ -459,6 +463,7 @@ function resetPlayers() {
     isSeq = false;
     mainAudio.pause();
     mainAudio.currentTime = 0;
+    if(shaInterval) clearInterval(shaInterval);
     playerControls.forEach(p => {
         p.div.classList.remove('player-done');
         p.rBtn.style.display = "none";
@@ -570,17 +575,42 @@ function play(p) {
 }
 
 function startShadowing(txt) {
+    if(shaInterval) clearInterval(shaInterval);
     $('modalSHA').style.display = 'flex'; $('shaText').textContent = txt;
     let t = 5; $('shaTimer').textContent = t;
-    const itv = setInterval(() => {
+    
+    shaInterval = setInterval(() => {
         t--; $('shaTimer').textContent = t;
-        if(t <= 0 || !isSeq) { clearInterval(itv); $('modalSHA').style.display = 'none'; if(isSeq) nextInSeq(); }
+        if(t <= 0 || !isSeq) { 
+            clearInterval(shaInterval); 
+            $('modalSHA').style.display = 'none'; 
+            if(isSeq) nextInSeq(); 
+        }
     }, 1000);
 }
+
+// Obsługa przycisków wewnątrz modalu SHA
+$('skipShaBtn').onclick = () => {
+    if(shaInterval) clearInterval(shaInterval);
+    $('modalSHA').style.display = 'none';
+    // Skip zatrzymuje tylko licznik wizualny, zostając w trybie sekwencji bez wymuszania natychmiastowego audio
+};
+
+$('nextShaBtn').onclick = () => {
+    if(shaInterval) clearInterval(shaInterval);
+    $('modalSHA').style.display = 'none';
+    if(isSeq) {
+        nextInSeq();
+    }
+};
+
 function nextInSeq() {
     curIdx++;
     while(curIdx < playerControls.length && playerControls[curIdx].div.style.display === 'none') curIdx++;
-    if(curIdx < playerControls.length) { playerControls[curIdx].div.scrollIntoView({behavior:'smooth', block:'center'}); play(playerControls[curIdx]); }
+    if(curIdx < playerControls.length) { 
+        playerControls[curIdx].div.scrollIntoView({behavior:'smooth', block:'center'}); 
+        play(playerControls[curIdx]); 
+    }
 }
 function startSequence(type) { isSeq = true; playerControls.forEach(p => p.div.style.display = (type==='all' || p.type===type) ? 'block' : 'none'); curIdx = -1; nextInSeq(); }
 
@@ -611,7 +641,12 @@ function closeReto() {
 }
 
 $('brandingToggle').onclick = () => $('brandingPanel').classList.toggle('open');
-$('stopBtn').onclick = () => { isSeq = false; mainAudio.pause(); $('modalSHA').style.display='none'; };
+$('stopBtn').onclick = () => { 
+    isSeq = false; 
+    mainAudio.pause(); 
+    if(shaInterval) clearInterval(shaInterval); 
+    $('modalSHA').style.display='none'; 
+};
 
 async function init() {
     for(let i=1; i<=TRACK_COUNT; i++) {
