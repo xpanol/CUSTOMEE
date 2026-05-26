@@ -24,8 +24,8 @@
             --header-font-size: 44px;
             --main-text-size: 16px;
             --karaoke-size: 32px;
-            --main-font: 'Special Elite', monospace;
-            --head-font: 'Special Elite', monospace;
+            --main-font: 'Special Elite', cursive;
+            --head-font: 'Special Elite', cursive;
             
             --btn-scale: 1.0;
             --btn-border-w: 1px;
@@ -125,7 +125,7 @@
         }
         .filter-select option { background: #000; color: #fff; }
 
-        #players { max-width: 900px; margin: calc(var(--header-height) + 60px) auto 100px auto; padding: 20px; position: relative; z-index: 10; }
+        #players { max-width: 900px; margin: calc(var(--header-height) + 60px) auto 40px auto; padding: 20px; position: relative; z-index: 10; }
         .player { margin-bottom: 40px; padding: 30px; background: transparent; }
         .player-ui { display: flex; align-items: center; gap: 25px; }
         .play-btn { background: none; border: var(--btn-border-w) solid var(--btn-border-color); color: inherit; width: 60px; height: 60px; border-radius: 50%; cursor: pointer; font-size: 22px; transition: 0.2s; }
@@ -134,6 +134,77 @@
         .karaoke-line span { transition: color 0.1s; }
         .player-done .karaoke-line { color: var(--color-done) !important; opacity: 0.8; }
         .player-done .karaoke-line span { color: inherit !important; }
+
+        #fraseoGlossaryContainer {
+            max-width: 900px;
+            margin: 0 auto 100px auto;
+            padding: 20px;
+            position: relative;
+            z-index: 10;
+        }
+        .glossary-title {
+            font-family: var(--head-font);
+            font-size: 28px;
+            color: var(--brand-border);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 25px;
+            border-bottom: 2px solid var(--brand-border);
+            padding-bottom: 10px;
+        }
+        .glossary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .glossary-card {
+            background: #0d0d0d;
+            border: 1px solid #222;
+            border-radius: var(--card-radius);
+            padding: 20px;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .glossary-card:hover {
+            border-color: var(--brand-border);
+            transform: translateY(-2px);
+        }
+        .glossary-cat {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        .glossary-terms {
+            margin-bottom: 12px;
+        }
+        .glossary-es {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--color-es);
+            margin-bottom: 2px;
+        }
+        .glossary-en {
+            font-size: 16px;
+            font-style: italic;
+            color: var(--color-en);
+        }
+        .glossary-desc {
+            font-size: 13px;
+            line-height: 1.5;
+            color: #ccc;
+            margin-bottom: 12px;
+            border-top: 1px solid #1a1a1a;
+            padding-top: 8px;
+        }
+        .glossary-meta {
+            font-size: 11px;
+            color: #666;
+            line-height: 1.4;
+            background: #050505;
+            padding: 8px;
+            border-radius: 6px;
+        }
 
         .modal { 
             display:none;
@@ -158,7 +229,6 @@
         #systemHeard { font-size: 18px; color: var(--brand-text); margin-top: 20px; text-align: center; max-width: 80%; line-height: 1.6; letter-spacing: 1px; }
         #speechStatus { font-size: 12px; color: #888; margin-top: 5px; font-family: monospace; text-align: center; }
         
-        /* ZAAWANSOWANY RETRO MIKROFON */
         .retro-mic-outer {
             display: flex;
             align-items: center;
@@ -197,7 +267,6 @@
             100% { box-shadow: 0 0 15px rgba(255, 0, 0, 0.3); } 
         }
 
-        /* KOLOROWE SYGNALIZATORY (IKONKI STATUSU) */
         .status-dot {
             display: inline-block;
             width: 12px;
@@ -257,7 +326,7 @@
         <h3>4. Typography Settings</h3>
         <div class="b-row"><label>Header Font</label>
             <select id="selHeadFont" onchange="updateBranding()">
-                <option value="'Special Elite', monospace">Special Elite</option>
+                <option value="'Special Elite', cursive">Special Elite</option>
                 <option value="'Inter', sans-serif">Inter</option>
                 <option value="'Bebas Neue', sans-serif">Bebas Neue</option>
                 <option value="'Montserrat', sans-serif">Montserrat</option>
@@ -269,7 +338,7 @@
         
         <div class="b-row"><label>Body Font</label>
             <select id="selBodyFont" onchange="updateBranding()">
-                <option value="'Special Elite', monospace">Special Elite</option>
+                <option value="'Special Elite', cursive">Special Elite</option>
                 <option value="'Inter', sans-serif">Inter</option>
                 <option value="'Ubuntu', sans-serif">Ubuntu</option>
                 <option value="'Roboto Mono', monospace">Roboto Mono</option>
@@ -312,6 +381,11 @@
 </div>
 
 <div id="players"></div>
+
+<div id="fraseoGlossaryContainer">
+    <div class="glossary-title">FRASEO Marketing Dictionary</div>
+    <div id="glossaryGrid" class="glossary-grid"></div>
+</div>
 
 <div id="modalRETO" class="modal">
     <div class="reto-layout-container">
@@ -383,9 +457,12 @@
         </tbody>
     </table>
     
-    <div style="display:flex; gap:15px; margin-top:30px; width:450px; max-width:90%;">
-        <button class="main-btn" onclick="exportReportToPDF()" id="downloadPdfBtn" style="flex:1; padding:15px; background:#4CAF50; color:#000; font-weight:bold; border-color:#4CAF50;"> DOWNLOAD PDF REPORT</button>
-        <button class="main-btn" onclick="$('modalREPORT').style.display='none'" style="flex:1; padding:15px;">CLOSE</button>
+    <div style="display:flex; flex-direction:column; gap:10px; margin-top:30px; width:450px; max-width:90%;">
+        <div style="display:flex; gap:15px; width:100%;">
+            <button class="main-btn" onclick="exportReportToPDF()" id="downloadPdfBtn" style="flex:1; padding:15px; background:#4CAF50; color:#000; font-weight:bold; border-color:#4CAF50;">DOWNLOAD PDF REPORT</button>
+            <button class="main-btn" onclick="downloadAllRecordingsZIP()" id="downloadZipBtn" style="flex:1; padding:15px; background:#F8AC10; color:#000; font-weight:bold; border-color:#F8AC10;">DOWNLOAD MY AUDIOS (WAV)</button>
+        </div>
+        <button class="main-btn" onclick="$('modalREPORT').style.display='none'" style="width:100%; padding:12px;">CLOSE</button>
     </div>
 </div>
 
@@ -666,7 +743,7 @@ async function addPlayer(aUrl, jUrl, type) {
 
         const tagSpan = document.createElement('span');
         tagSpan.style.fontSize = '15px';
-        tagSpan.style.fontFamily = "'Special Elite', monospace";
+        tagSpan.style.fontFamily = "'Special Elite', cursive";
         tagSpan.style.color = '#aaaaaa';
         tagSpan.style.letterSpacing = '1px';
         tagSpan.textContent = currentTag.toUpperCase();
@@ -722,13 +799,21 @@ function openReto(p) {
 function closeReto() { 
     if(lastEvaluatedHtml !== "") {
         const currentTrack = playerControls[curIdx];
+        
+        let audioBlob = null;
+        if (audioChunks && audioChunks.length > 0) {
+            const mimeType = getSupportedMimeType() || mediaRecorder.mimeType || 'audio/wav';
+            audioBlob = new Blob(audioChunks, { type: mimeType });
+        }
+
         sessionHistoryLog.push({
             id: Math.floor(curIdx / 2) + 1,
             targetLang: currentTrack.type.toUpperCase(),
             score: lastEvaluatedScore,
             html: lastEvaluatedHtml,
             originalText: currentTrack.text,
-            heardTextRaw: lastCleanRawText || "(no phrase recognized)"
+            heardTextRaw: lastCleanRawText || "(no phrase recognized)",
+            audioBlob: audioBlob 
         });
     }
     $('modalRETO').style.display = 'none'; stopListeningState(); if (reviewAudio) reviewAudio.pause(); mainAudio.pause();
@@ -747,8 +832,10 @@ function openReport() {
         `;
         $('reportTableBody').innerHTML = `<tr><td colspan="5" style="text-align:center; color:#555; padding:30px;">No data recorded in this learning session yet. Run a PRO RETO challenge first.</td></tr>`;
         $('downloadPdfBtn').disabled = true;
+        if($('downloadZipBtn')) $('downloadZipBtn').disabled = true;
     } else {
         $('downloadPdfBtn').disabled = false;
+        if($('downloadZipBtn')) $('downloadZipBtn').disabled = false;
         let totalScoreSum = 0, good = 0, mid = 0, low = 0, rowsHtml = "";
         sessionHistoryLog.forEach(item => {
             totalScoreSum += item.score;
@@ -842,7 +929,6 @@ function exportReportToPDF() {
 
     const tableRows = [];
     sessionHistoryLog.forEach(item => {
-        // ZAKTUALIZOWANA LINIA: Usunięto prefiks '15', zostawiając czysty i prosty numer porządkowy typu #1, #2...
         tableRows.push([ `#${item.id}`, item.targetLang, `${item.score}%`, `Original: "${item.originalText}"\nHeard: "${item.heardTextRaw}"` ]);
     });
     doc.autoTable({
@@ -864,6 +950,156 @@ function exportReportToPDF() {
     });
 
     doc.save(`Session_Performance_Report_${Date.now()}.pdf`);
+}
+
+async function downloadAllRecordingsZIP() {
+    const validRecordings = sessionHistoryLog.filter(item => item.audioBlob !== null);
+
+    if (validRecordings.length === 0) {
+        alert("Brak nagrań w tej sesji! Uruchom tryb PRO RETO, nagraj głos, a następnie pobierz plik.");
+        return;
+    }
+
+    const changeBtn = $('downloadZipBtn');
+    changeBtn.textContent = "MERGING AUDIO...";
+    changeBtn.disabled = true;
+
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+        const audioBuffers = [];
+
+        for (const item of validRecordings) {
+            const arrayBuffer = await item.audioBlob.arrayBuffer();
+            try {
+                const decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                audioBuffers.push(decodedBuffer);
+            } catch (decodeError) {
+                console.error("Pominięto plik z powodu błędu dekodowania:", decodeError);
+            }
+        }
+
+        if (audioBuffers.length === 0) {
+            alert("Nie udało się zdekodować żadnego pliku audio.");
+            return;
+        }
+
+        const numChannels = Math.max(...audioBuffers.map(b => b.numberOfChannels));
+        const sampleRate = audioBuffers[0].sampleRate;
+        const totalLength = audioBuffers.reduce((acc, buf) => acc + buf.length, 0);
+
+        const mergedBuffer = audioCtx.createBuffer(numChannels, totalLength, sampleRate);
+        
+        for (let channel = 0; channel < numChannels; channel++) {
+            const mergedData = mergedBuffer.getChannelData(channel);
+            let offset = 0;
+            for (const buffer of audioBuffers) {
+                if (channel < buffer.numberOfChannels) {
+                    mergedData.set(buffer.getChannelData(channel), offset);
+                }
+                offset += buffer.length;
+            }
+        }
+
+        const wavBlob = bufferToWav(mergedBuffer);
+
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(wavBlob);
+        link.download = `Fraseo_Session_Merged_${Date.now()}.wav`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+    } catch (err) {
+        console.error("Błąd podczas łączenia audio:", err);
+        alert("Wystąpił błąd podczas scalania plików audio.");
+    } finally {
+        changeBtn.textContent = "DOWNLOAD MY AUDIOS (WAV)";
+        changeBtn.disabled = false;
+    }
+}
+
+function bufferToWav(buffer) {
+    const numOfChan = buffer.numberOfChannels,
+          length = buffer.length * numOfChan * 2 + 44,
+          bufferArr = new ArrayBuffer(length),
+          view = new DataView(bufferArr),
+          channels = [], 
+          sampleRate = buffer.sampleRate;
+    let i, sample, offset = 0, pos = 0;
+
+    setUint32(0x46464952); 
+    setUint32(length - 8); 
+    setUint32(0x45564157); 
+    setUint32(0x20746d66); 
+    setUint32(16);         
+    setUint16(1);          
+    setUint16(numOfChan);
+    setUint32(sampleRate);
+    setUint32(sampleRate * 2 * numOfChan); 
+    setUint16(numOfChan * 2);              
+    setUint16(16);                         
+    setUint32(0x61746164); 
+    setUint32(length - pos - 4); 
+
+    for(i = 0; i < buffer.numberOfChannels; i++) {
+        channels.push(buffer.getChannelData(i));
+    }
+
+    while(pos < length) {
+        for(i = 0; i < numOfChan; i++) {
+            sample = Math.max(-1, Math.min(1, channels[i][offset])); 
+            sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+            view.setInt16(pos, sample, true);
+            pos += 2;
+        }
+        offset++;
+    }
+
+    return new Blob([bufferArr], { type: "audio/wav" });
+
+    function setUint16(data) { view.setUint16(pos, data, true); pos += 2; }
+    function setUint32(data) { view.setUint32(pos, data, true); pos += 4; }
+}
+
+async function loadFraseoDictionary() {
+    try {
+        const response = await fetch('fraseo_marketing_dictionary.json');
+        const data = await response.json();
+        
+        const grid = $('glossaryGrid');
+        grid.innerHTML = ''; 
+
+        data.dictionary.forEach(item => {
+            console.log(`FRASEO Boost [${item.id}]: ${item.term_es} -> ${item.term_en}`);
+            
+            const card = document.createElement('div');
+            card.className = 'glossary-card';
+            
+            const synsEs = item.synonyms_es ? item.synonyms_es.join(', ') : '';
+            const synsEn = item.synonyms_en ? item.synonyms_en.join(', ') : '';
+
+            card.innerHTML = `
+                <div class="glossary-cat">${item.category} (Track #${item.sentence_match_id})</div>
+                <div class="glossary-terms">
+                    <div class="glossary-es">${item.term_es}</div>
+                    <div class="glossary-en">${item.term_en}</div>
+                </div>
+                <div class="glossary-desc">
+                    <strong>ES:</strong> ${item.concept_es}<br><br>
+                    <strong>EN:</strong> ${item.concept_en}
+                </div>
+                <div class="glossary-meta">
+                    <strong>Synonyms (ES):</strong> ${synsEs}<br>
+                    <strong>Synonyms (EN):</strong> ${synsEn}<br><br>
+                    <strong>Pitfall:</strong> ${item.pitfall_en}
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+    } catch (error) {
+        console.error("Error integrating FRASEO dictionary module:", error);
+    }
 }
 
 $('brandingToggle').onclick = () => $('brandingPanel').classList.toggle('open');
@@ -897,6 +1133,8 @@ async function init() {
         await addPlayer(BASE_URL+n+'_es.mp3', BASE_URL+n+'_es.json', 'es');
         await addPlayer(BASE_URL+'Z'+n+'_en.mp3', BASE_URL+'Z'+n+'_en.json', 'en');
     }
+    
+    await loadFraseoDictionary();
 }
 document.addEventListener('DOMContentLoaded', () => { init(); updateBranding(); });
 </script>
