@@ -257,7 +257,7 @@
         <h3>4. Typography Settings</h3>
         <div class="b-row"><label>Header Font</label>
             <select id="selHeadFont" onchange="updateBranding()">
-                <option value="'Special Elite', cursive">Special Elite</option>
+                <option value="'Special Elite', monospace">Special Elite</option>
                 <option value="'Inter', sans-serif">Inter</option>
                 <option value="'Bebas Neue', sans-serif">Bebas Neue</option>
                 <option value="'Montserrat', sans-serif">Montserrat</option>
@@ -269,7 +269,7 @@
         
         <div class="b-row"><label>Body Font</label>
             <select id="selBodyFont" onchange="updateBranding()">
-                <option value="'Special Elite', cursive">Special Elite</option>
+                <option value="'Special Elite', monospace">Special Elite</option>
                 <option value="'Inter', sans-serif">Inter</option>
                 <option value="'Ubuntu', sans-serif">Ubuntu</option>
                 <option value="'Roboto Mono', monospace">Roboto Mono</option>
@@ -666,7 +666,7 @@ async function addPlayer(aUrl, jUrl, type) {
 
         const tagSpan = document.createElement('span');
         tagSpan.style.fontSize = '15px';
-        tagSpan.style.fontFamily = "'Special Elite', cursive";
+        tagSpan.style.fontFamily = "'Special Elite', monospace";
         tagSpan.style.color = '#aaaaaa';
         tagSpan.style.letterSpacing = '1px';
         tagSpan.textContent = currentTag.toUpperCase();
