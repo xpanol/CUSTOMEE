@@ -201,7 +201,7 @@
     
     <div class="b-section">
         <h3>1. Identity & Logo</h3>
-        <div class="b-row"><label>Company Name</label><input type="text" id="inCompName" value="FRASAL KARAOKE" oninput="updateBranding()"></div>
+        <div class="b-row"><label>Company Name</label><input type="text" id="inCompName" value="FRASEO MARKETING DIGITAL | DIGITAL MARKETING" oninput="updateBranding()"></div>
         <div class="b-row"><label>Logo URL</label><input type="text" id="inLogoUrl" placeholder="https://..." oninput="updateBranding()"></div>
         <div class="b-row"><label>Logo Scale (px)</label><input type="range" id="rgLogoScale" min="20" max="600" value="100" oninput="updateBranding()"></div>
         <div class="b-row"><label>Logo V-Offset</label><input type="range" id="rgLogoMargin" min="-200" max="400" value="10" oninput="updateBranding()"></div>
@@ -267,7 +267,7 @@
 
 <div id="stickyHeader">
     <img id="companyLogo" src="" alt="logo">
-    <h1 id="companyName">FRASAL KARAOKE</h1>
+    <h1 id="companyName">FRASEO MARKETING DIGITAL | DIGITAL MARKETING</h1>
     <div id="buttonsContainer">
         <button onclick="startSequence('all')" class="main-btn">PLAY ALL</button>
         <button onclick="startSequence('es')" class="main-btn">SPANISH</button>
@@ -316,7 +316,7 @@
 </div>
 
 <div id="modalREPORT" class="modal">
-    <div id="reportTitleName" style="font-family:var(--head-font); font-size:24px; color:var(--brand-border); margin-bottom:10px; text-transform:uppercase; letter-spacing:3px;">FRASAL KARAOKE - PERFORMANCE REPORT</div>
+    <div id="reportTitleName" style="font-family:var(--head-font); font-size:24px; color:var(--brand-border); margin-bottom:10px; text-transform:uppercase; letter-spacing:3px;">FRASEO MARKETING DIGITAL | DIGITAL MARKETING - PERFORMANCE REPORT</div>
     <div style="font-size:12px; color:#666; margin-bottom:20px; font-family:monospace;">Generated locally by Native Intelligence System</div>
     
     <div class="report-grid">
@@ -563,7 +563,7 @@ function resetPlayers() {
 
 function updateBranding() {
     const root = document.documentElement;
-    const compName = $('inCompName').value || "FRASAL KARAOKE";
+    const compName = $('inCompName').value || "FRASEO MARKETING DIGITAL | DIGITAL MARKETING";
     
     $('companyName').textContent = compName;
     $('reportTitleName').textContent = compName.toUpperCase() + " - PERFORMANCE REPORT";
@@ -781,7 +781,7 @@ function exportReportToPDF() {
         if(item.score >= 80) good++; else if(item.score >= 50) mid++; else low++;
     });
     const globalAvg = Math.round(totalScoreSum / sessionHistoryLog.length);
-    const companyBrandingName = $('inCompName').value || "FRASAL KARAOKE";
+    const companyBrandingName = $('inCompName').value || "FRASEO MARKETING DIGITAL | DIGITAL MARKETING";
 
     doc.setFillColor(0, 0, 0);
     doc.rect(0, 0, 210, 40, 'F');
