@@ -12,7 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Inter:wght@300;400;700;900&family=Montserrat:wght@300;400;700;800&family=Bebas+Neue&family=Syncopate:wght@400;700&family=Ubuntu:wght@300;400;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     
     <style>
-        /* 3. Tutaj mówimy przeglądarce, aby domyślnie używała fontu 'Special Elite' na całej stronie */
+        /* Default page font */
         body {
             font-family: 'Special Elite', sans-serif;
         }
@@ -111,19 +111,24 @@
         .main-btn {
             background: transparent;
             color: inherit; 
-            padding: calc(10px * var(--btn-scale)) calc(20px * var(--btn-scale)); 
+            padding: calc(10px * var(--btn-scale)) calc(14px * var(--btn-scale)); 
             border: var(--btn-border-w) solid var(--btn-border-color); cursor: pointer; font-family: inherit;
             font-size: calc(12px * var(--btn-scale)); border-radius: var(--card-radius); transition: 0.2s;
             text-transform: uppercase;
         }
         .main-btn:hover { background: var(--btn-border-color); color: #000; }
+        .sha-btn:hover { background: var(--color-es) !important; color: #000 !important; }
+        #nextShaBtn:hover { color: #000 !important; }
+        #playOrigBtn:hover { color: #000 !important; }
+        #systemHeard { color: #888 !important; }
         .main-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
         .filter-select {
             background: transparent;
             color: inherit;
-            padding: calc(9px * var(--btn-scale)) calc(15px * var(--btn-scale));
+            padding: calc(10px * var(--btn-scale)) calc(14px * var(--btn-scale));
             border: var(--btn-border-w) solid var(--btn-border-color);
+            box-sizing: border-box;
             cursor: pointer;
             font-family: inherit;
             font-size: calc(12px * var(--btn-scale));
@@ -131,12 +136,16 @@
             outline: none;
             text-transform: uppercase;
         }
+        #tagFilterSelect {
+            width: 145px;
+        }
         .filter-select option { background: #000; color: #fff; }
 
         #players { max-width: 900px; margin: calc(var(--header-height) + 60px) auto 40px auto; padding: 20px; position: relative; z-index: 10; }
         .player { margin-bottom: 40px; padding: 30px; background: transparent; }
         .player-ui { display: flex; align-items: center; gap: 25px; }
         .play-btn { background: none; border: var(--btn-border-w) solid var(--btn-border-color); color: inherit; width: 60px; height: 60px; border-radius: 50%; cursor: pointer; font-size: 22px; transition: 0.2s; }
+        .play-btn.active { background: var(--brand-border) !important; color: #000 !important; }
 
         .karaoke-line { font-size: var(--karaoke-size); line-height: 1.4; transition: 0.2s; color: var(--brand-text); }
         .karaoke-line span { transition: color 0.1s; }
@@ -274,7 +283,7 @@
         <button onclick="startSequence('en')" class="main-btn">ENGLISH</button>
         <button onclick="resetPlayers()" class="main-btn"> REFRESH</button>
         
-        <select id="tagFilterSelect" onchange="filterPlayersByTag()" class="filter-select">
+        <select id="tagFilterSelect" onchange="filterPlayersByTag()" class="filter-select" style="-webkit-appearance:none !important; appearance:none !important; width:170px !important; height:40px !important; font-size:12px !important; color:var(--brand-text) !important; border-radius:var(--card-radius) !important; box-shadow:none !important; background-color:transparent !important; background-image:linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%) !important; background-position:calc(100% - 18px) 50%, calc(100% - 13px) 50% !important; background-size:5px 5px, 5px 5px !important; background-repeat:no-repeat !important; padding-right:30px !important;">
             <option value="ALL"> SHOW ALL TAGS</option>
         </select>
 
@@ -379,6 +388,9 @@ let recordedUrl = null;
 let reviewAudio = null;
 let globalStream = null;
 let shaInterval = null;
+let retoRecordingStartedAt = 0;
+let recognitionRestartTimer = null;
+const RETO_MIN_RECORDING_MS = 6500;
 
 let sessionHistoryLog = []; 
 let lastEvaluatedScore = 0;
@@ -413,26 +425,46 @@ function initSpeechRecognition() {
     };
     recognition.onerror = (e) => {
         console.error("Speech error:", e.error);
+        if (e.error === "no-speech" && isListening && Date.now() - retoRecordingStartedAt < RETO_MIN_RECORDING_MS) {
+            $('speechStatus').textContent = "Listening to your voice...";
+            return;
+        }
         $('speechStatus').textContent = "Error: " + e.error;
         stopListeningState();
     };
 
-    recognition.onend = () => { if (isListening) stopListeningState(); };
-    recognition.onresult = (e) => { calculateAccuracy(e.results[0][0].transcript); };
+    recognition.onend = () => {
+        if (!isListening) return;
+        if (Date.now() - retoRecordingStartedAt < RETO_MIN_RECORDING_MS) {
+            clearTimeout(recognitionRestartTimer);
+            recognitionRestartTimer = setTimeout(() => {
+                if (!isListening) return;
+                try { recognition.start(); } catch(e) { stopListeningState(); }
+            }, 250);
+            return;
+        }
+        stopListeningState();
+    };
+    recognition.onresult = (e) => {
+        const result = e.results[0][0];
+        calculateAccuracy(result.transcript, result.confidence);
+    };
     return true;
 }
 
 function stopListeningState() {
     isListening = false;
+    clearTimeout(recognitionRestartTimer);
     $('startRec').classList.remove('rec-pulse-btn');
     $('micOuterFrame').classList.remove('rec-pulse-outer');
+    const shouldStopStream = !(mediaRecorder && mediaRecorder.state === "recording");
     if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
-    if (globalStream) { globalStream.getTracks().forEach(track => track.stop()); globalStream = null; }
+    if (shouldStopStream && globalStream) { globalStream.getTracks().forEach(track => track.stop()); globalStream = null; }
     if (recognition) { try { recognition.stop(); } catch(e) {} }
     if($('speechStatus').textContent === "Listening to your voice...") $('speechStatus').textContent = "Analysis complete.";
 }
 
-function calculateAccuracy(heardText) {
+function calculateAccuracy(heardText, confidence) {
     const currentTrack = playerControls[curIdx];
     lastCleanRawText = heardText;
     const cleanStr = str => {
@@ -440,7 +472,7 @@ function calculateAccuracy(heardText) {
         return str.toLowerCase()
             .normalize("NFD")
             .replace(/[\u0300-\u036f]/g, "")
-            .replace(/[¿¡.,\/#!$%\^&\*;:{}=\-_`~()?"'żˇżˇ«»“”指標‘’`´—–]/g, "")
+            .replace(/[¿¡.,\/#!$%\^&\*;:{}=\-_`~()?"'żˇżˇ«»“”‘’`´—–]/g, "")
             .replace(/\s+/g, ' ')
             .trim();
     };
@@ -456,7 +488,7 @@ function calculateAccuracy(heardText) {
             fallbackOutput += `<span style="color:#f03246; text-decoration:line-through; opacity:0.7;">${word}</span> `;
         });
         lastEvaluatedHtml = fallbackOutput.trim();
-        $('systemHeard').innerHTML = `<strong>Visual Comparison:</strong><br>${lastEvaluatedHtml}`;
+        $('systemHeard').innerHTML = `<strong>System heard:</strong><br>(no phrase recognized)<br><br><strong>Visual Comparison:</strong><br>${lastEvaluatedHtml}`;
         updateIndicatorDot(0);
         return;
     }
@@ -476,14 +508,40 @@ function calculateAccuracy(heardText) {
     const distance = getLevenshteinDistance(s1, s2);
     const maxLength = Math.max(s1.length, s2.length);
     let accuracyPercentage = Math.round(((maxLength - distance) / maxLength) * 100);
-    if (accuracyPercentage >= 92) accuracyPercentage = 100;
+    if (accuracyPercentage >= 96) accuracyPercentage = 100;
+    
+    const originalWordsClean = s1.split(/\s+/);
+    const heardWordsClean = s2.split(/\s+/);
+    const suspiciousNotes = [];
+    const confidenceValue = typeof confidence === 'number' ? confidence : 1;
+    const lengthRatio = Math.min(s1.length, s2.length) / Math.max(s1.length, s2.length);
+    const wordGap = Math.abs(originalWordsClean.length - heardWordsClean.length);
+    const minimalPairs = [
+        ['pero', 'perro'], ['caro', 'carro'], ['casa', 'caza'], ['pollo', 'poyo'],
+        ['beach', 'bitch'], ['ship', 'sheep'], ['live', 'leave'], ['full', 'fool'], ['sheet', 'shit']
+    ];
+    
+    if (confidenceValue < 0.6 && accuracyPercentage > 70) {
+        accuracyPercentage -= 8;
+        suspiciousNotes.push('low confidence');
+    }
+    if (accuracyPercentage > 85 && (lengthRatio < 0.75 || wordGap > 2)) {
+        accuracyPercentage -= 10;
+        suspiciousNotes.push('suspicious match');
+    }
+    minimalPairs.forEach(pair => {
+        if ((originalWordsClean.includes(pair[0]) && heardWordsClean.includes(pair[1])) ||
+            (originalWordsClean.includes(pair[1]) && heardWordsClean.includes(pair[0]))) {
+            accuracyPercentage -= 12;
+            suspiciousNotes.push('minimal pair');
+        }
+    });
     
     lastEvaluatedScore = Math.max(0, Math.min(accuracyPercentage, 100));
     $('accuracyText').textContent = lastEvaluatedScore + '%';
     
     updateIndicatorDot(lastEvaluatedScore);
     const originalWords = currentTrack.text.split(/\s+/);
-    const heardWordsClean = s2.split(/\s+/);
     
     let htmlOutput = "";
     originalWords.forEach(word => {
@@ -492,7 +550,8 @@ function calculateAccuracy(heardText) {
         else htmlOutput += `<span style="color:#f03246; text-decoration:line-through; opacity:0.7;">${word}</span> `;
     });
     lastEvaluatedHtml = htmlOutput.trim();
-    $('systemHeard').innerHTML = `<strong>Visual Comparison:</strong><br>${lastEvaluatedHtml}`;
+    const warningText = suspiciousNotes.length ? `<br><small style="color:#F8AC10;">Check pronunciation: ${[...new Set(suspiciousNotes)].join(', ')}</small>` : '';
+    $('systemHeard').innerHTML = `<strong>System heard:</strong><br>${heardText}<br><br><strong>Visual Comparison:</strong><br>${lastEvaluatedHtml}${warningText}`;
 }
 
 function updateIndicatorDot(score) {
@@ -519,8 +578,10 @@ $('startRec').onclick = async () => {
             mediaRecorder.onstop = () => {
                 const finalMime = mimeType || mediaRecorder.mimeType || 'audio/wav';
                 recordedUrl = URL.createObjectURL(new Blob(audioChunks, { type: finalMime }));
+                if (globalStream) { globalStream.getTracks().forEach(track => track.stop()); globalStream = null; }
                 $('playRecBtn').style.display = 'block';
             };
+            retoRecordingStartedAt = Date.now();
             mediaRecorder.start(); recognition.start();
         } catch(e) { console.error(e); try { recognition.start(); } catch(err) {} }
     } else { stopListeningState(); }
@@ -554,7 +615,8 @@ function resetPlayers() {
     playerControls.forEach(p => { 
         p.div.style.display = 'block'; 
         p.div.classList.remove('player-done'); 
-        p.rBtn.style.display = "none"; 
+        p.rBtn.style.display = "none";
+        p.sBtn.style.display = "none";
         p.spans.forEach(s => s.style.color = 'inherit');
         if(p.dotSpan) p.dotSpan.className = "status-dot dot-none";
     });
@@ -615,6 +677,8 @@ async function addPlayer(aUrl, jUrl, type) {
         const line = document.createElement('div'); line.className = 'karaoke-line';
         const rBtn = document.createElement('button'); rBtn.className = 'main-btn';
         rBtn.textContent = 'PRO RETO'; rBtn.style.display = "none"; rBtn.style.marginTop = "15px";
+        const sBtn = document.createElement('button'); sBtn.className = 'main-btn sha-btn';
+        sBtn.textContent = 'SHA!'; sBtn.style.display = "none"; sBtn.style.marginTop = "15px"; sBtn.style.borderColor = "var(--color-es)"; sBtn.style.color = "var(--color-es)";
         
         data.forEach(l => {
             l.text.split(' ').forEach((w, j) => {
@@ -647,16 +711,20 @@ async function addPlayer(aUrl, jUrl, type) {
         infoContainer.append(dotSpan, tagSpan);
 
         const ui = document.createElement('div'); ui.className = "player-ui"; const content = document.createElement('div');
-        content.style.flex = "1"; content.append(line, infoContainer, rBtn); ui.append(pBtn, content); div.append(ui); $('players').appendChild(div);
+        const actionBtns = document.createElement('div'); actionBtns.style.display = 'flex'; actionBtns.style.gap = '10px'; actionBtns.style.flexWrap = 'wrap';
+        actionBtns.append(rBtn, sBtn);
+        content.style.flex = "1"; content.append(line, infoContainer, actionBtns); ui.append(pBtn, content); div.append(ui); $('players').appendChild(div);
         
-        const ctrl = { div, spans: line.querySelectorAll('span'), type, audio: aUrl, text: data.map(d=>d.text).join(' '), rBtn, tag: currentTag, dotSpan };
+        const ctrl = { div, spans: line.querySelectorAll('span'), type, audio: aUrl, text: data.map(d=>d.text).join(' '), rBtn, sBtn, tag: currentTag, dotSpan };
         playerControls.push(ctrl);
-        pBtn.onclick = () => { isSeq = false; play(ctrl); }; rBtn.onclick = () => openReto(ctrl);
+        pBtn.onclick = () => { isSeq = false; play(ctrl); }; rBtn.onclick = () => openReto(ctrl); sBtn.onclick = () => startShadowing(ctrl.text);
     } catch(e) {}
 }
 
 function play(p) {
     curIdx = playerControls.indexOf(p); p.div.classList.remove('player-done'); mainAudio.src = p.audio; mainAudio.play();
+    playerControls.forEach(c => c.div.querySelector('.play-btn').classList.remove('active'));
+    p.div.querySelector('.play-btn').classList.add('active');
     const clr = p.type === 'es' ? 'var(--color-es)' : 'var(--color-en)';
     const anim = () => {
         if(mainAudio.paused) return; const time = mainAudio.currentTime;
@@ -664,14 +732,14 @@ function play(p) {
         requestAnimationFrame(anim);
     };
     requestAnimationFrame(anim);
-    mainAudio.onended = () => { p.div.classList.add('player-done'); p.rBtn.style.display = "inline-block"; if(isSeq) startShadowing(p.text); };
+    mainAudio.onended = () => { p.div.classList.add('player-done'); p.div.querySelector('.play-btn').classList.remove('active'); p.rBtn.style.display = "inline-block"; p.sBtn.style.display = "inline-block"; if(isSeq) startShadowing(p.text); };
 }
 
 function startShadowing(txt) {
     if(shaInterval) clearInterval(shaInterval); $('modalSHA').style.display = 'flex'; $('shaText').textContent = txt;
     let t = 5;
     $('shaTimer').textContent = t;
-    shaInterval = setInterval(() => { t--; $('shaTimer').textContent = t; if(t <= 0 || !isSeq) { clearInterval(shaInterval); $('modalSHA').style.display = 'none'; if(isSeq) nextInSeq(); } }, 1000);
+    shaInterval = setInterval(() => { t--; $('shaTimer').textContent = t; if(t <= 0) { clearInterval(shaInterval); $('modalSHA').style.display = 'none'; if(isSeq) nextInSeq(); } }, 1000);
 }
 
 $('skipShaBtn').onclick = () => { if(shaInterval) clearInterval(shaInterval); $('modalSHA').style.display = 'none'; };
@@ -783,52 +851,63 @@ function exportReportToPDF() {
     const globalAvg = Math.round(totalScoreSum / sessionHistoryLog.length);
     const companyBrandingName = $('inCompName').value || "FRASEO MARKETING DIGITAL | DIGITAL MARKETING";
 
+    doc.setTextColor(255, 255, 255); doc.setFont("Helvetica", "bold"); 
+    doc.setFontSize(18);
+    const titleLines = doc.splitTextToSize(companyBrandingName, 180);
+    const titleY = titleLines.length > 1 ? 13 : 18;
+    const subtitleY = titleY + (titleLines.length * 5.5) + 3;
+    const generatedY = subtitleY + 7;
+    const headerHeight = Math.max(40, generatedY + 7);
+    const summaryY = headerHeight + 10;
+    const tableTitleY = summaryY + 37;
+    const tableStartY = tableTitleY + 5;
+
     doc.setFillColor(0, 0, 0);
-    doc.rect(0, 0, 210, 40, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFont("Helvetica", "bold"); doc.setFontSize(22); doc.text(companyBrandingName, 15, 18);
+    doc.rect(0, 0, 210, headerHeight, 'F');
+    doc.text(titleLines, 15, titleY);
     
     doc.setFont("Helvetica", "normal"); doc.setFontSize(11); doc.setTextColor(248, 172, 16);
-    doc.text("SESSION PERFORMANCE REPORT", 15, 26);
+    doc.text("SESSION PERFORMANCE REPORT", 15, subtitleY);
     
-    doc.setFontSize(8); doc.setTextColor(140, 140, 140); doc.text(`Generated on: ${new Date().toLocaleString()} | Engine: Native Speech Intelligence`, 15, 33);
+    doc.setFontSize(8); doc.setTextColor(140, 140, 140); doc.text(`Generated on: ${new Date().toLocaleString()} | Engine: Native Speech Intelligence`, 15, generatedY);
     doc.setDrawColor(200, 200, 200); 
 
     doc.setFillColor(255, 255, 255);
-    doc.rect(15, 50, 55, 25, 'FD'); 
+    doc.rect(15, summaryY, 55, 25, 'FD'); 
     doc.setFont("Helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(0, 0, 0);
-    doc.text("GLOBAL ACCURACY", 20, 56);
+    doc.text("GLOBAL ACCURACY", 20, summaryY + 6);
     doc.setFont("Helvetica", "bold"); doc.setFontSize(18); 
-    doc.setTextColor(27, 94, 32); doc.text(`${globalAvg}%`, 20, 68);
+    doc.setTextColor(27, 94, 32); doc.text(`${globalAvg}%`, 20, summaryY + 18);
 
     doc.setFillColor(255, 255, 255);
-    doc.rect(78, 50, 55, 25, 'FD'); 
-    doc.setFont("Helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(0, 0, 0); doc.text("TOTAL RETO RUNS", 83, 56);
+    doc.rect(78, summaryY, 55, 25, 'FD'); 
+    doc.setFont("Helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(0, 0, 0); doc.text("TOTAL RETO RUNS", 83, summaryY + 6);
     doc.setFont("Helvetica", "bold"); doc.setFontSize(20);
-    doc.setTextColor(0, 0, 0); doc.text(`${sessionHistoryLog.length}`, 83, 68);
+    doc.setTextColor(0, 0, 0); doc.text(`${sessionHistoryLog.length}`, 83, summaryY + 18);
 
     doc.setFillColor(255, 255, 255);
-    doc.rect(140, 50, 55, 25, 'FD'); 
+    doc.rect(140, summaryY, 55, 25, 'FD'); 
     doc.setFont("Helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(0, 0, 0);
-    doc.text("PERFORMANCE BREAKDOWN", 144, 56);
+    doc.text("PERFORMANCE BREAKDOWN", 144, summaryY + 6);
     doc.setFont("Helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(0, 0, 0); 
     
-    doc.setFillColor(46, 125, 50); doc.rect(144, 59.5, 2, 2, 'F');
-    doc.text(`Good (>=80%): ${good}`, 148, 62);
+    doc.setFillColor(46, 125, 50); doc.rect(144, summaryY + 9.5, 2, 2, 'F');
+    doc.text(`Good (>=80%): ${good}`, 148, summaryY + 12);
     
-    doc.setFillColor(216, 131, 0); doc.rect(144, 64.5, 2, 2, 'F');
-    doc.text(`Mid (50-79%): ${mid}`, 148, 67);
-    doc.setFillColor(198, 40, 40); doc.rect(144, 69.5, 2, 2, 'F');
-    doc.text(`Low (<50%): ${low}`, 148, 72);
+    doc.setFillColor(216, 131, 0); doc.rect(144, summaryY + 14.5, 2, 2, 'F');
+    doc.text(`Mid (50-79%): ${mid}`, 148, summaryY + 17);
+    doc.setFillColor(198, 40, 40); doc.rect(144, summaryY + 19.5, 2, 2, 'F');
+    doc.text(`Low (<50%): ${low}`, 148, summaryY + 22);
 
     doc.setFont("Helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(0, 0, 0);
-    doc.text("Visual Comparison Analytics Log", 15, 87);
+    doc.text("Visual Comparison Analytics Log", 15, tableTitleY);
 
     const tableRows = [];
     sessionHistoryLog.forEach(item => {
         tableRows.push([ `#${item.id}`, item.targetLang, `${item.score}%`, `Original: "${item.originalText}"\nHeard: "${item.heardTextRaw}"` ]);
     });
     doc.autoTable({
-        startY: 92,
+        startY: tableStartY,
         head: [['ID', 'Lang', 'Score', 'Text Analytics Transcript (Evaluated vs Original)']],
         body: tableRows,
         theme: 'striped',
@@ -850,7 +929,7 @@ function exportReportToPDF() {
 async function downloadAllRecordingsZIP() {
     const validRecordings = sessionHistoryLog.filter(item => item.audioBlob !== null);
     if (validRecordings.length === 0) {
-        alert("Brak nagrań w tej sesji! Uruchom tryb PRO RETO, nagraj głos, a następnie pobierz plik.");
+        alert("No recordings in this session. Run PRO RETO, record your voice, then download the file.");
         return;
     }
 
@@ -868,12 +947,12 @@ async function downloadAllRecordingsZIP() {
                 const decodedBuffer = await audioCtx.decodeAudioData(arrayBuffer);
                 audioBuffers.push(decodedBuffer);
             } catch (decodeError) {
-                console.error("Pominięto plik z powodu błędu dekodowania:", decodeError);
+                console.error("Skipped file because of a decoding error:", decodeError);
             }
         }
 
         if (audioBuffers.length === 0) {
-            alert("Nie udało się zdekodować żadnego pliku audio.");
+            alert("No audio files could be decoded.");
             return;
         }
 
@@ -901,8 +980,8 @@ async function downloadAllRecordingsZIP() {
         link.click();
         document.body.removeChild(link);
     } catch (err) {
-        console.error("Błąd podczas łączenia audio:", err);
-        alert("Wystąpił błąd podczas scalania plików audio.");
+        console.error("Error while merging audio:", err);
+        alert("An error occurred while merging audio files.");
     } finally {
         changeBtn.textContent = "DOWNLOAD MY AUDIOS (WAV)";
         changeBtn.disabled = false;
@@ -974,7 +1053,7 @@ async function init() {
             });
         }
     } catch (error) {
-        console.error("Błąd ładowania zewnętrznych tagów:", error);
+        console.error("Error loading external tags:", error);
     }
 
     for(let i=1; i<=TRACK_COUNT; i++) {
@@ -988,4 +1067,4 @@ document.addEventListener('DOMContentLoaded', () => { init(); updateBranding(); 
 </script>
 
 </body>
-</html>
+</html
