@@ -11,7 +11,54 @@
     
     <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Inter:wght@300;400;700;900&family=Montserrat:wght@300;400;700;800&family=Bebas+Neue&family=Syncopate:wght@400;700&family=Ubuntu:wght@300;400;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     
+    <script>
+        document.documentElement.classList.add('auth-pending');
+    </script>
+
     <style>
+        html.auth-pending body > :not(#authGate) {
+            display: none !important;
+        }
+
+        #authGate {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            color: #fff;
+            z-index: 10000;
+            font-family: 'Special Elite', cursive;
+            text-align: center;
+            padding: 24px;
+        }
+
+        html:not(.auth-pending) #authGate {
+            display: none;
+        }
+
+        .auth-gate-box {
+            max-width: 460px;
+            border: 1px solid #F8AC10;
+            border-radius: 12px;
+            padding: 28px;
+        }
+
+        .auth-gate-box h2 {
+            margin: 0 0 12px 0;
+            color: #F8AC10;
+            font-size: 24px;
+            line-height: 1.4;
+        }
+
+        .auth-gate-box p {
+            margin: 0;
+            color: #ddd;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
         /* Default page font */
         body {
             font-family: 'Special Elite', sans-serif;
@@ -201,6 +248,13 @@
 </head>
 <body>
 
+<div id="authGate">
+    <div class="auth-gate-box">
+        <h2>Checking access...</h2>
+        <p>This page is available only after signing in.</p>
+    </div>
+</div>
+
 <div id="bg-layer"></div>
 <button id="brandingToggle"> BRANDING</button>
 
@@ -372,6 +426,63 @@
         <button class="main-btn" onclick="$('modalREPORT').style.display='none'" style="width:100%; padding:12px;">CLOSE</button>
     </div>
 </div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAAGPNktzjNlqXirf4bq-MVYRynW88oiP4",
+        authDomain: "fraseo-marketing-digital.firebaseapp.com",
+        projectId: "fraseo-marketing-digital",
+        storageBucket: "fraseo-marketing-digital.firebasestorage.app",
+        messagingSenderId: "238473898395",
+        appId: "1:238473898395:web:ec7763b50c31d486d6193e"
+    };
+
+    const LOGIN_URL = "https://xpanol.github.io/marketing-portal/";
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const authGate = document.getElementById("authGate");
+
+    function redirectToLogin() {
+        const nextUrl = encodeURIComponent(window.location.href);
+        window.location.replace(`${LOGIN_URL}?next=${nextUrl}`);
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+        if (!user) {
+            redirectToLogin();
+            return;
+        }
+
+        try {
+            const userEmail = user.email.toLowerCase();
+            const accessRef = doc(db, "marketing_digital", userEmail);
+            const accessSnap = await getDoc(accessRef);
+
+            if (!accessSnap.exists() || accessSnap.data().active !== true) {
+                await signOut(auth);
+                redirectToLogin();
+                return;
+            }
+
+            document.documentElement.classList.remove("auth-pending");
+            if (authGate) authGate.remove();
+            window.dispatchEvent(new Event("xpanol-auth-ready"));
+        } catch (error) {
+            await signOut(auth);
+            redirectToLogin();
+        }
+    }, () => {
+        if (authGate) {
+            authGate.querySelector("h2").textContent = "Access check failed";
+            authGate.querySelector("p").textContent = "Please reload the page or sign in again.";
+        }
+    });
+</script>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -1063,7 +1174,7 @@ async function init() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => { init(); updateBranding(); });
+window.addEventListener('xpanol-auth-ready', () => { init(); updateBranding(); }, { once: true });
 </script>
 
 </body>
